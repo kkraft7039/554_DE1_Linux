@@ -1,4 +1,9 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <stdint.h>
 
 #define SDRAM_BASE 0xC0000000
 #define SDRAM_SPAN 0x04000000 // 64 MB size (0xC3FFFFFF - 0xC0000000 + 1)
