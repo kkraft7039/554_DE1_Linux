@@ -7,7 +7,7 @@
 
 #define SDRAM_BASE 0xC0000000
 #define SDRAM_SPAN 0x04000000 // 64 MB size (0xC3FFFFFF - 0xC0000000 + 1)
-#define NUM_READ_DATA 8
+#define NUM_READ_DATA 1 
 
 int main() {
 	int fd;
@@ -19,7 +19,7 @@ int main() {
 	}
 
 	virtual_base = (char *) mmap(NULL, SDRAM_SPAN, (PROT_READ | PROT_WRITE), MAP_SHARED, fd, SDRAM_BASE);
-	volatile uint32_t *sdram_addr = (volatile uint32_t *)virtual_base;
+	volatile uint16_t *sdram_addr = (volatile uint16_t *)virtual_base;
 
 	for (int i = 0; i < NUM_READ_DATA; i++) {
 		printf("Val %d: %X\n", i, *(sdram_addr + i)); 
