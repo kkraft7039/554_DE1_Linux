@@ -5,9 +5,9 @@
 #include <unistd.h>
 #include <stdint.h>
 
-#define SDRAM_BASE 0xC0000000
-#define SDRAM_SPAN 0x04000000 // 64 MB size (0xC3FFFFFF - 0xC0000000 + 1)
-#define NUM_READ_DATA 1 
+#define SDRAM_BASE 0xFF200000
+#define SDRAM_SPAN 0x00005000 // 64 MB size (0xC3FFFFFF - 0xC0000000 + 1)
+#define NUM_READ_DATA 8 
 
 int main() {
 	int fd;
@@ -18,16 +18,16 @@ int main() {
 	    return(1);
 	}
 
-	virtual_base = (char *) mmap(NULL, SDRAM_SPAN, PROT_RE, MAP_SHARED, fd, SDRAM_BASE);
+	virtual_base = (char *) mmap(NULL, SDRAM_SPAN, PROT_READ, MAP_SHARED, fd, SDRAM_BASE);
 	if (virtual_base == MAP_FAILED) {
 		perror("mmap");
 		close(fd);
 		return 1;
 	}
-	volatile uint16_t *sdram_addr = (volatile uint16_t *)virtual_base;
+	volatile uint32_t *sdram_addr = (volatile uint32_t *)virtual_base;
 	
-	printf("mmap succesful\n");
-
+	printf("mmap succesful: %p\n", sdram_addr);
+	
 	for (int i = 0; i < NUM_READ_DATA; i++) {
 		printf("Val %d: %X\n", i, *(sdram_addr + i)); 
 	}

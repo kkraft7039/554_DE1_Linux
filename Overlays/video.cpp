@@ -9,8 +9,8 @@ int main() {
     }
 
     // Try a common resolution
-    cap.set(CV_CAP_PROP_FRAME_WIDTH, 320);
-    cap.set(CV_CAP_PROP_FRAME_HEIGHT, 240);
+    cap.set(CV_CAP_PROP_FRAME_WIDTH, 800);
+    cap.set(CV_CAP_PROP_FRAME_HEIGHT, 600);
 
     cv::Mat frame;
 

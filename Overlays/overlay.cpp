@@ -8,10 +8,8 @@ int main() {
         return 1;
     }
 
-    cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC('M','J','P','G'));
     cap.set(CV_CAP_PROP_FRAME_WIDTH, 800);
     cap.set(CV_CAP_PROP_FRAME_HEIGHT, 600);
-    cap.set(CV_CAP_PROP_FPS, 30);
 
     int x = 0;
     int y = 100;
