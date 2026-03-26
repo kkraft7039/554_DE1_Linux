@@ -2,13 +2,12 @@
 #include <iostream>
 
 int main() {
-    cv::VideoCapture cap(0);  // usually /dev/video0
+    cv::VideoCapture cap(0);  // /dev/video0
     if (!cap.isOpened()) {
         std::cerr << "Error: could not open camera\n";
         return 1;
     }
 
-    // Optional: lower resolution for better performance on DE1-SoC
     cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
     cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 
@@ -30,11 +29,11 @@ int main() {
         int w = frame.cols;
         int h = frame.rows;
 
-        // Update box position
+        // Update position
         x += vx;
         y += vy;
 
-        // Bounce off edges
+        // Bounce logic
         if (x < 0 || x + boxW > w) {
             vx = -vx;
             x += vx;
@@ -44,20 +43,22 @@ int main() {
             y += vy;
         }
 
-        // Draw filled rectangle on a copy for transparency
-        cv::Mat overlay = frame.clone();
+        // Create overlay
+        cv::Mat overlay;
+        frame.copyTo(overlay);  // safer for OpenCV 2.x than clone()
+
         cv::rectangle(
             overlay,
             cv::Rect(x, y, boxW, boxH),
-            cv::Scalar(0, 255, 0),   // BGR: green
-            -1                       // filled
+            cv::Scalar(0, 255, 0),
+            -1
         );
 
-        // Blend overlay with original frame
+        // Blend
         double alpha = 0.35;
         cv::addWeighted(overlay, alpha, frame, 1.0 - alpha, 0.0, frame);
 
-        // Optional label
+        // Text
         cv::putText(
             frame,
             "Test Overlay",
@@ -70,7 +71,6 @@ int main() {
 
         cv::imshow("Camera Overlay", frame);
 
-        // ESC or q to quit
         char key = (char)cv::waitKey(1);
         if (key == 27 || key == 'q') {
             break;
