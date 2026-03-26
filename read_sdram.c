@@ -18,8 +18,15 @@ int main() {
 	    return(1);
 	}
 
-	virtual_base = (char *) mmap(NULL, SDRAM_SPAN, (PROT_READ | PROT_WRITE), MAP_SHARED, fd, SDRAM_BASE);
+	virtual_base = (char *) mmap(NULL, SDRAM_SPAN, PROT_RE, MAP_SHARED, fd, SDRAM_BASE);
+	if (virtual_base == MAP_FAILED) {
+		perror("mmap");
+		close(fd);
+		return 1;
+	}
 	volatile uint16_t *sdram_addr = (volatile uint16_t *)virtual_base;
+	
+	printf("mmap succesful\n");
 
 	for (int i = 0; i < NUM_READ_DATA; i++) {
 		printf("Val %d: %X\n", i, *(sdram_addr + i)); 
