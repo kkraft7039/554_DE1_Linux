@@ -9,8 +9,8 @@ int main() {
     }
 
     // Optional: lower resolution for better performance on DE1-SoC
-    cap.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+    cap.set(CV_CAP_PROP_FRAME_WIDTH, 640);
+    cap.set(CV_CAP_PROP_FRAME_HEIGHT, 480);
 
     int x = 0;
     int y = 100;
