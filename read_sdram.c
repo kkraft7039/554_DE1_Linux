@@ -10,7 +10,7 @@
 #define NUM_READ_DATA 8
 
 int main() {
-	int mem_fd;
+	int fd;
 	void *virtual_base;
 	
 	if ((fd = open("/dev/mem", (O_RDWR | O_SYNC))) == -1) {
@@ -22,7 +22,7 @@ int main() {
 	volatile uint32_t *sdram_addr = (volatile uint32_t *)virtual_base;
 
 	for (int i = 0; i < NUM_READ_DATA; i++) {
-		printf("Val %d: %X", i, *(sdram_addr + i)); 
+		printf("Val %d: %X\n", i, *(sdram_addr + i)); 
 	}
 
 	// 4. Clean up (Unmap and close)
