@@ -4,7 +4,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <stdint.h>
-
+#include <string.h>
 // Lightweight HPS-to-FPGA Bridge Base Address
 #define HW_REGS_BASE        0xFF200000 
 #define HW_REGS_SPAN        0x00200000 // 2MB span
@@ -23,10 +23,6 @@ int main() {
         printf("Error: Could not open /dev/mem.\n");
         return 1;
     }
-
-    // 2. Blast the memory with solid white (0xFF)
-    printf("Painting screen white...\n");
-    memset(pixel_memory, 0xFF, 640 * 480 * 4);
 
     // 2. Map the Lightweight Bridge into virtual memory
     void *lw_bridge_virtual = mmap(NULL, HW_REGS_SPAN, PROT_READ | PROT_WRITE, MAP_SHARED, fd, HW_REGS_BASE);
