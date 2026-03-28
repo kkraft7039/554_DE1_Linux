@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#include <sys/mmap.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <stdint.h>
 
@@ -14,7 +14,7 @@
 #define HEATMAP_RAM_OFFSET  0x00000000 // Replace with your On-Chip Memory base address
 
 // Physical memory for the VGA Framebuffer
-#define FRAMEBUFFER_PHYS    0x38000000 
+#define FRAMEBUFFER_PHYS    0x10000000 
 
 int main() {
     // 1. Open physical memory
