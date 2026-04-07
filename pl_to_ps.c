@@ -10,7 +10,7 @@
 #define HW_REGS_SPAN 0x00200000 
 
 // PIO Offsets from the Qsys memory map
-#define LED_PIO_OFFSET    0x00010000 // PS -> PL (req_clk)
+#define LED_PIO_OFFSET    0x00010040 // PS -> PL (req_clk)
 #define DIPSW_PIO_OFFSET  0x00010080 // PL -> PS (valid, ack, data)
 
 int main() {
@@ -50,7 +50,7 @@ int main() {
         uint8_t  ack_from_pl;
         uint8_t  data_valid;
         uint8_t  data_byte;
-
+	
         // --- 2. WAIT FOR ACKNOWLEDGE ---
         // Equivalent to: ps_wait_for_ack()
         do {
@@ -63,7 +63,7 @@ int main() {
         do {
             dipsw_val = *dipsw_pio;
             data_valid = dipsw_val & 0x01;         // Extract Bit 0
-        } while (data_valid == 0);
+	} while (data_valid == 0);
         
         // --- 4. EXTRACT DATA ---
         // Equivalent to: assert_byte_expected()
