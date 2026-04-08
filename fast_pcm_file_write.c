@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
 	if (argc > 1) {
 		file_name = argv[1];
 	}
-    FILE *fp = fopen(file, "w");
+    FILE *fp = fopen(file_name, "w");
     for (int i = 0; i < NUM_SAMPLES; i++) {
         fprintf(fp, "%d\n", audio_buffer[i]);
     }
