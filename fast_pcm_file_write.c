@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
     volatile uint32_t *led_pio   = (uint32_t *)((uint8_t *)virtual_base + LED_PIO_OFFSET);
     volatile uint32_t *dipsw_pio = (uint32_t *)((uint8_t *)virtual_base + DIPSW_PIO_OFFSET);
 
-    uint32_t current_req_clk = 0;
+    uint32_t current_req_clk = 2;
     *led_pio = current_req_clk; 
 
     // 1. ALLOCATE HUGE ARRAY IN RAM (No file I/O during capture)
@@ -47,6 +47,8 @@ int main(int argc, char *argv[]) {
         uint8_t lsb = get_next_byte(led_pio, dipsw_pio, &current_req_clk);
         audio_buffer[i] = (int16_t)((msb << 8) | lsb);
     }
+	
+	current_req_clk &= 0x01; // zero all bits excepts last
 
     printf("Capture complete! Writing to SD card now...\n");
 
