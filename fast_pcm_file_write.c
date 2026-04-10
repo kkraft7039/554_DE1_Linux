@@ -17,9 +17,8 @@
 uint8_t get_next_byte(volatile uint32_t *led_pio, volatile uint32_t *dipsw_pio, uint32_t *current_req) {
     *current_req ^= 0x01; 
     *led_pio = *current_req;
-    
     uint32_t dipsw_val;
-    do { dipsw_val = *dipsw_pio; } while (((dipsw_val >> 1) & 0x01) != *current_req);
+    do { dipsw_val = *dipsw_pio; } while (((dipsw_val >> 1) & 0x01) != (*current_req & 0x01));
     do { dipsw_val = *dipsw_pio; } while ((dipsw_val & 0x01) == 0);
     
     return (dipsw_val >> 2) & 0xFF;       
@@ -49,7 +48,7 @@ int main(int argc, char *argv[]) {
     }
 	
 	current_req_clk &= 0x01; // zero all bits excepts last
-
+	*led_pio = current_req_clk;
     printf("Capture complete! Writing to SD card now...\n");
 
 	char* file_name = "pcm_audio.csv";

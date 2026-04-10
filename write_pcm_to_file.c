@@ -93,6 +93,9 @@ int main() {
         }
     }
 
+    current_req_clk &= 1;
+    *led_pio = current_req_clk; // Initialize req_clk to 0
+
     printf("Recording complete! Saved to pcm_audio.csv\n");
 
     // Clean up

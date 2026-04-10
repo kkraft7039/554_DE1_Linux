@@ -68,7 +68,7 @@ int main() {
         // --- 4. EXTRACT DATA ---
         // Equivalent to: assert_byte_expected()
         data_byte = (dipsw_val >> 2) & 0xFF;       // Extract Bits 9:2
-        
+	printf("Out data is: 0x%02X\n", *led_pio);         
         printf("Exchange %d: Received Data Byte = 0x%02X\n", count, data_byte);
     }
 
