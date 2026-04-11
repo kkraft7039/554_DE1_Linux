@@ -42,8 +42,8 @@ int main(int argc, char *argv[]) {
 
     // 2. THE HIGH-SPEED CAPTURE LOOP
     for (int i = 0; i < NUM_SAMPLES; i++) {
-        uint8_t msb = get_next_byte(led_pio, dipsw_pio, &current_req_clk);
         uint8_t lsb = get_next_byte(led_pio, dipsw_pio, &current_req_clk);
+        uint8_t msb = get_next_byte(led_pio, dipsw_pio, &current_req_clk);
         audio_buffer[i] = (int16_t)((msb << 8) | lsb);
     }
 	
