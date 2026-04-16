@@ -3,6 +3,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
 
 #define LW_BRIDGE_BASE      0xFF200000
 #define DMA_OFFSET          0x00000000 // Starts at base now
@@ -14,16 +16,31 @@
 #define TRANSFER_LENGTH     16777216   // 16 MB
 
 int main() {
-    int fd = open("/dev/mem", O_RDWR | O_SYNC);
-    if (fd < 0) {
-        perror("Failed to open /dev/mem");
-        return 1;
-    }
-
-    // Map hardware components
-    volatile uint32_t *dma         = (uint32_t *)mmap(NULL, 32, PROT_READ | PROT_WRITE, MAP_SHARED, fd, LW_BRIDGE_BASE + DMA_OFFSET);
-    volatile uint32_t *trigger_pio = (uint32_t *)mmap(NULL, 16, PROT_READ | PROT_WRITE, MAP_SHARED, fd, LW_BRIDGE_BASE + PIO_TRIGGER_OFFSET);
-    volatile uint32_t *merger_pio  = (uint32_t *)mmap(NULL, 16, PROT_READ | PROT_WRITE, MAP_SHARED, fd, LW_BRIDGE_BASE + PIO_MERGER_OFFSET);
+	int fd = open("/dev/mem", O_RDWR | O_SYNC);
+	if (fd < 0) {
+	    printf("ERROR: Could not open /dev/mem. Did you use sudo? (%s)\n", strerror(errno));
+	    return 1;
+	}
+	
+	// Map a larger chunk once (0x1000 = 4KB) to cover all registers
+	void *virtual_base = mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, LW_BRIDGE_BASE);
+	if (virtual_base == MAP_FAILED) {
+	    printf("ERROR: mmap failed (%s)\n", strerror(errno));
+	    close(fd);
+	    return 1;
+	}
+	
+	// Calculate offsets from the single base
+	volatile uint32_t *dma         = (uint32_t *)(virtual_base + DMA_OFFSET);
+	volatile uint32_t *trigger_pio = (uint32_t *)(virtual_base + PIO_TRIGGER_OFFSET);
+	volatile uint32_t *merger_pio  = (uint32_t *)(virtual_base + PIO_MERGER_OFFSET);
+	
+	printf("Memory mapped successfully. About to touch hardware...\n");
+	fflush(stdout); // Force the print to show up before a potential crash
+	
+	// Try touching a register
+	uint32_t status = dma[0]; 
+	printf("DMA Status Read: 0x%08X\n", status);
 
     // 1. Reset system state
     *trigger_pio = 0;       // Stop FPGA from writing to FIFO
@@ -41,7 +58,7 @@ int main() {
     dma[3] = TRANSFER_LENGTH;
 
     // Control: WORD (bit 2) | GO (bit 3) | LEEN (bit 7) | RCON (bit 8)
-    dma[6] = (1 << 2) | (1 << 3) | (1 << 7) | (1 << 8);
+    dma[6] = (1 << 11) | (1 << 3) | (1 << 7) | (1 << 8);
 
     printf("DMA armed and waiting for data...\n");
 
@@ -53,7 +70,7 @@ int main() {
     // The DMA will automatically pause/resume based on FIFO waitrequest
     int timeout = 0;
     while (dma[0] & 0x02) { // Loop while BUSY bit is 1
-        usleep(10000); 
+        usleep(100000); 
         if (++timeout > 2000) { // ~20 second safety timeout
             printf("Timeout: DMA is still busy. Check FPGA data flow!\n");
             break;
