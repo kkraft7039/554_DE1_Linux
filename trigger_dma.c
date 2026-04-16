@@ -13,7 +13,7 @@
 
 #define FIFO_READ_ADDR      0x00000000 // 'out' port of fifo_0
 #define SDRAM_WRITE_ADDR    0x30000000 // Your reserved 16MB zone
-#define TRANSFER_LENGTH     16777216   // 16 MB
+#define TRANSFER_LENGTH     3840000   // 16 MB
 
 int main() {
 	int fd = open("/dev/mem", O_RDWR | O_SYNC);
@@ -81,7 +81,7 @@ int main() {
     *trigger_pio = 0; 
     
     if (dma[0] & 0x01) {
-        printf("Success: 16MB of audio data is now at 0x30000000.\n");
+        printf("Success: 3MB of audio data is now at 0x30000000.\n");
     }
 
     munmap((void*)dma, 32);
