@@ -13,7 +13,7 @@
 
 #define FIFO_READ_ADDR      0x00000000 // 'out' port of fifo_0
 #define SDRAM_WRITE_ADDR    0x30000000 // Your reserved 16MB zone
-#define TRANSFER_LENGTH     7680000  // 16 MB
+#define TRANSFER_LENGTH     16432000  // 16 MB
 
 int main() {
 	int fd = open("/dev/mem", O_RDWR | O_SYNC);
