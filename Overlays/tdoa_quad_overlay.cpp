@@ -12,6 +12,9 @@ int main() {
     cap.set(CV_CAP_PROP_FRAME_WIDTH, 800);
     cap.set(CV_CAP_PROP_FRAME_HEIGHT, 600);
 
+    cv::namedWindow("Camera", CV_WINDOW_NORMAL);
+    cv::setWindowProperty("Camera", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+
     cv::Mat frame;
 
     // Fade strength for each quadrant:
@@ -95,7 +98,14 @@ int main() {
             if (quadFade[i] < 0.0f) quadFade[i] = 0.0f;
         }
 
-        cv::imshow("Camera Overlay", frame);
+        // Resize frame to fill the display window
+        cv::resize(frame, displayFrame, cv::Size(1600, 1200));  // screen res
+        cv::imshow("Camera Overlay", displayFrame);
+
+        char key = (char)cv::waitKey(1);
+        if (key == 27 || key == 'q') {
+            break;
+        }
     }
 
     cap.release();
