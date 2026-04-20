@@ -16,7 +16,7 @@ typedef struct {
 // t2 = Mic 2 (Bottom-Left)
 // t3 = Mic 3 (Top-Left)
 // t4 = Mic 4 (Top-Right)
-SoundLocation calculate_sound_origin(uint32_t t1, uint32_t t2, uint32_t t3, uint32_t t4) {
+SoundLocation calculate_sound_origin(uint16_t t1, uint16_t t2, uint16_t t3, uint16_t t4) {
     SoundLocation loc;
     
     // 1. Convert clock cycles to absolute seconds

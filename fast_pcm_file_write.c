@@ -20,6 +20,8 @@ uint8_t get_next_byte(volatile uint32_t *led_pio, volatile uint32_t *dipsw_pio, 
     uint32_t dipsw_val;
     do { dipsw_val = *dipsw_pio; } while (((dipsw_val >> 1) & 0x01) != (*current_req & 0x01));
     do { dipsw_val = *dipsw_pio; } while ((dipsw_val & 0x01) == 0);
+    usleep(1);
+    dipsw_val = *dipsw_pio;
     
     return (dipsw_val >> 2) & 0xFF;       
 }
