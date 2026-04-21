@@ -9,13 +9,13 @@
 #include <cstdlib>
 #include <ctime>
 
-// ---------------- Hardware interface (from fast_pcm_file_write.c) ----------------
+// Hardware interface
 #define HW_REGS_BASE      0xFF200000
 #define HW_REGS_SPAN      0x00200000
 #define LED_PIO_OFFSET    0x00010040   // PS -> PL
 #define DIPSW_PIO_OFFSET  0x00010080   // PL -> PS
 
-// ---------------- Localization constants (from localize.c) ----------------
+// Localization constants
 #define SPEED_OF_SOUND_M_S 343.0
 #define CLOCK_FREQ_HZ      50000000.0
 #define ARRAY_SPACING_M    0.2345
