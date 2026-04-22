@@ -94,6 +94,7 @@ static uint8_t read_quadrant(HwInterface &hw)
     if (!hw.led_pio || !hw.dipsw_pio) return 0;
 
     uint8_t quad = get_next_byte(hw.led_pio, hw.dipsw_pio, &hw.current_req_clk);
+    uint8_t garb = get_next_byte(hw.led_pio, hw.dipsw_pio, &hw.current_req_clk);
 
     if (quad > 4) return 0;
     return quad;
