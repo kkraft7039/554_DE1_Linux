@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <stdio.h>
 
 // Hardware interface
 #define HW_REGS_BASE      0xFF200000
@@ -48,14 +49,14 @@ static bool init_hardware(HwInterface &hw)
 {
     hw.fd = open("/dev/mem", O_RDWR | O_SYNC);
     if (hw.fd < 0) {
-        std::perror("open /dev/mem");
+        perror("open /dev/mem");
         return false;
     }
 
     hw.virtual_base = mmap(NULL, HW_REGS_SPAN, PROT_READ | PROT_WRITE,
                            MAP_SHARED, hw.fd, HW_REGS_BASE);
     if (hw.virtual_base == MAP_FAILED) {
-        std::perror("mmap");
+        perror("mmap");
         close(hw.fd);
         hw.fd = -1;
         return false;
@@ -199,8 +200,7 @@ int main() {
             if (quadFade[i] < 0.0f) quadFade[i] = 0.0f;
         }
 
-        cv::resize(frame, displayFrame, cv::Size(1600, 1200));
-        cv::imshow("Camera Overlay", displayFrame);
+        cv::imshow("Camera Overlay", frame);
     }
 
     cap.release();
