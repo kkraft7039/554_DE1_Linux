@@ -31,7 +31,6 @@ struct HwInterface {
     void *virtual_base;
     volatile uint32_t *led_pio;
     volatile uint32_t *dipsw_pio;
-    bool acked;
     uint32_t current_req_clk;
 
     HwInterface()
@@ -39,31 +38,35 @@ struct HwInterface {
 };
 
 // Same byte reader as fast_pcm_file_write.c
-static uint8_t get_next_byte(volatile uint32_t *led_pio,
-                             volatile uint32_t *dipsw_pio,
-                             uint32_t *current_req)
+static bool get_next_byte(HwInterface &hw,
+                          uint8_t &byte_out)
 {
-    *current_req ^= 0x01;
-    *led_pio = *current_req;
+    static bool waiting = false;
+    uint32_t dipsw_val = *hw.dipsw_pio;
 
-    uint32_t dipsw_val;
-
-    dissw_val = *dipdw_pio
-
-    if (!hw.acked) {
-        if (((dipsw_val >> 1) & 0x01) != (*current_req & 0x01)) {
-            hw.acked = true;
-        }
-        return NULL;
-    } else {
-        if ((dipsw_val & 0x01) != 0) {
-            return NULL;
-        }
+    // Phase 1: request byte
+    if (!waiting) {
+        hw.current_req_clk ^= 0x01;
+        *hw.led_pio = hw.current_req_clk;
+        waiting = true;
+        return false;
     }
 
-    usleep(1);
-    dipsw_val = *dipsw_pio;
-    return (uint8_t)((dipsw_val >> 2) & 0xFF);
+    // Phase 2: wait for PL ack to match request bit
+    if (((dipsw_val >> 1) & 0x01) != (hw.current_req_clk & 0x01)) {
+        return false;
+    }
+
+    // Phase 3: wait for valid/data-ready bit
+    if ((dipsw_val & 0x01) == 0) {
+        return false;
+    }
+
+    byte_out = (uint8_t)((dipsw_val >> 2) & 0xFF);
+
+    // Ready for next byte
+    waiting = false;
+    return true;
 }
 
 static bool init_hardware(HwInterface &hw)
@@ -85,7 +88,6 @@ static bool init_hardware(HwInterface &hw)
 
     hw.led_pio   = (volatile uint32_t *)((uint8_t *)hw.virtual_base + LED_PIO_OFFSET);
     hw.dipsw_pio = (volatile uint32_t *)((uint8_t *)hw.virtual_base + DIPSW_PIO_OFFSET);
-    hw.acked = false;
 
     hw.current_req_clk = 2;
     *hw.led_pio = hw.current_req_clk;
@@ -114,18 +116,30 @@ static void close_hardware(HwInterface &hw)
 //   mic3 LSB, mic3 MSB, mic2 LSB, mic2 MSB, mic1 LSB, mic1 MSB, mic0 LSB, mic0 MSB
 static bool read_mic_delays(HwInterface &hw, uint16_t mic_delay[4])
 {
-    if (!hw.led_pio || !hw.dipsw_pio) return false;
+    static uint8_t bytes[8];
+    static int byte_index = 0;
 
-    for (int i = 3; i >= 0; --i) {
-        uint8_t lsb = get_next_byte(hw.led_pio, hw.dipsw_pio, &hw.current_req_clk);
-        uint8_t msb = get_next_byte(hw.led_pio, hw.dipsw_pio, &hw.current_req_clk);
-        if (lsb == NULL) {
-            return false
-        }
-        mic_delay[i] = (uint16_t)((msb << 8) | lsb);
-        std::cout<<"Mic "<<i<<": "<<mic_delay[i]<<"\n"; 
+    uint8_t byte;
+    if (!get_next_byte(hw, byte)) {
+        return false;
     }
-    std::cout<<"\n";
+
+    bytes[byte_idx++] = byte;
+
+    if (byte_idx < 8) {
+        return false;
+    }
+
+    byte_idx = 0;
+
+    // PL sends: mic3 LSB, mic3 MSB, mic2 LSB, mic2 MSB, ...
+    int k = 0;
+    for (int i = 3; i >= 0; --i) {
+        uint8_t lsb = bytes[k++];
+        uint8_t msb = bytes[k++];
+        mic_delay[i] = (uint16_t)((msb << 8) | lsb);
+    }
+
     return true;
 }
 
