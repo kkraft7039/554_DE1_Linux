@@ -102,12 +102,12 @@ static void close_hardware(HwInterface &hw)
 
 // Reads 4x16-bit mic delay/timestamp values using the same byte handshake.
 // Assumes the PL is presenting:
-//   mic0 LSB, mic0 MSB, mic1 LSB, mic1 MSB, mic2 LSB, mic2 MSB, mic3 LSB, mic3 MSB
+//   mic3 LSB, mic3 MSB, mic2 LSB, mic2 MSB, mic1 LSB, mic1 MSB, mic0 LSB, mic0 MSB
 static bool read_mic_delays(HwInterface &hw, uint16_t mic_delay[4])
 {
     if (!hw.led_pio || !hw.dipsw_pio) return false;
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 3; i >= 0; --i) {
         uint8_t lsb = get_next_byte(hw.led_pio, hw.dipsw_pio, &hw.current_req_clk);
         uint8_t msb = get_next_byte(hw.led_pio, hw.dipsw_pio, &hw.current_req_clk);
         mic_delay[i] = (uint16_t)((msb << 8) | lsb);
@@ -283,8 +283,6 @@ int main()
         // Optional marker at the estimated center.
         cv::circle(displayFrame, last_center, 5, cv::Scalar(255, 255, 255), -1);
 
-        // Resize to fill the display window.
-        cv::resize(displayFrame, displayFrame, cv::Size(1600, 1200));
         cv::imshow("Camera Overlay", displayFrame);
 
         char key = (char)cv::waitKey(1);
