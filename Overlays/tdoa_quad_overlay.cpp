@@ -122,7 +122,7 @@ int main() {
     cv::setWindowProperty("Camera Overlay", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
 
     cv::Mat frame;
-    cv::Mat displayFrame;
+
 
     // Fade strength for each quadrant:
     // 1 = top-right, 2 = top-left, 3 = bottom-right, 4 = bottom-left

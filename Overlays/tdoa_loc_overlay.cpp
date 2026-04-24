@@ -125,6 +125,7 @@ static bool read_mic_delays(HwInterface &hw, uint16_t mic_delay[4])
     }
 
     bytes[byte_idx++] = byte;
+    std::cout << byte << "\n";
 
     if (byte_idx < 8) {
         return false;
@@ -238,7 +239,6 @@ int main()
 
     HwInterface hw;
     bool hw_ok = init_hardware(hw);
-    std::cout<<"Hardware Initialized\n";
     if (!hw_ok) {
         std::cerr << "Warning: hardware interface could not be opened. Running camera only.\n";
     }

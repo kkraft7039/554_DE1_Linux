@@ -32,8 +32,9 @@ int main() {
     // 3. Assign pointers to the specific PIO blocks
     volatile uint32_t *led_pio   = (uint32_t *)((uint8_t *)virtual_base + LED_PIO_OFFSET);
     volatile uint32_t *dipsw_pio = (uint32_t *)((uint8_t *)virtual_base + DIPSW_PIO_OFFSET);
-
-    uint32_t current_req_clk = 0;
+	
+	
+    uint32_t current_req_clk = 0x00;
     *led_pio = current_req_clk; // Initialize req_clk to 0
 
     printf("Starting PL to PS data exchange...\n\n");
@@ -57,7 +58,7 @@ int main() {
             dipsw_val = *dipsw_pio;
             ack_from_pl = (dipsw_val >> 1) & 0x01; // Extract Bit 1
         } while (ack_from_pl != current_req_clk);
-        
+       printf("Data ack\n"); 
         // --- 3. WAIT FOR DATA VALID ---
         // Equivalent to: ps_wait_for_valid()
         do {
@@ -71,6 +72,7 @@ int main() {
 	printf("Out data is: 0x%02X\n", *led_pio);         
         printf("Exchange %d: Received Data Byte = 0x%02X\n", count, data_byte);
     }
+
 
     // Clean up memory mapping
     if (munmap(virtual_base, HW_REGS_SPAN) != 0) {
