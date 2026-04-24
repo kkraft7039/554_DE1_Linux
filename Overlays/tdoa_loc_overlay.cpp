@@ -117,7 +117,7 @@ static void close_hardware(HwInterface &hw)
 static bool read_mic_delays(HwInterface &hw, uint16_t mic_delay[4])
 {
     static uint8_t bytes[8];
-    static int byte_index = 0;
+    static int byte_idx = 0;
 
     uint8_t byte;
     if (!get_next_byte(hw, byte)) {
