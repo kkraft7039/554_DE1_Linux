@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <ctime>
+#include <stdio.h>
 
 // Hardware interface
 #define HW_REGS_BASE      0xFF200000
@@ -30,6 +31,7 @@ struct HwInterface {
     void *virtual_base;
     volatile uint32_t *led_pio;
     volatile uint32_t *dipsw_pio;
+    bool acked;
     uint32_t current_req_clk;
 
     HwInterface()
@@ -45,13 +47,19 @@ static uint8_t get_next_byte(volatile uint32_t *led_pio,
     *led_pio = *current_req;
 
     uint32_t dipsw_val;
-    do {
-        dipsw_val = *dipsw_pio;
-    } while (((dipsw_val >> 1) & 0x01) != (*current_req & 0x01));
 
-    do {
-        dipsw_val = *dipsw_pio;
-    } while ((dipsw_val & 0x01) == 0);
+    dissw_val = *dipdw_pio
+
+    if (!hw.acked) {
+        if (((dipsw_val >> 1) & 0x01) != (*current_req & 0x01)) {
+            hw.acked = true;
+        }
+        return NULL;
+    } else {
+        if ((dipsw_val & 0x01) != 0) {
+            return NULL;
+        }
+    }
 
     usleep(1);
     dipsw_val = *dipsw_pio;
@@ -62,14 +70,14 @@ static bool init_hardware(HwInterface &hw)
 {
     hw.fd = open("/dev/mem", O_RDWR | O_SYNC);
     if (hw.fd < 0) {
-        std::perror("open /dev/mem");
+        perror("open /dev/mem");
         return false;
     }
 
     hw.virtual_base = mmap(NULL, HW_REGS_SPAN, PROT_READ | PROT_WRITE,
                            MAP_SHARED, hw.fd, HW_REGS_BASE);
     if (hw.virtual_base == MAP_FAILED) {
-        std::perror("mmap");
+        perror("mmap");
         close(hw.fd);
         hw.fd = -1;
         return false;
@@ -77,6 +85,7 @@ static bool init_hardware(HwInterface &hw)
 
     hw.led_pio   = (volatile uint32_t *)((uint8_t *)hw.virtual_base + LED_PIO_OFFSET);
     hw.dipsw_pio = (volatile uint32_t *)((uint8_t *)hw.virtual_base + DIPSW_PIO_OFFSET);
+    hw.acked = false;
 
     hw.current_req_clk = 2;
     *hw.led_pio = hw.current_req_clk;
@@ -110,8 +119,13 @@ static bool read_mic_delays(HwInterface &hw, uint16_t mic_delay[4])
     for (int i = 3; i >= 0; --i) {
         uint8_t lsb = get_next_byte(hw.led_pio, hw.dipsw_pio, &hw.current_req_clk);
         uint8_t msb = get_next_byte(hw.led_pio, hw.dipsw_pio, &hw.current_req_clk);
+        if (lsb == NULL) {
+            return false
+        }
         mic_delay[i] = (uint16_t)((msb << 8) | lsb);
+        std::cout<<"Mic "<<i<<": "<<mic_delay[i]<<"\n"; 
     }
+    std::cout<<"\n";
     return true;
 }
 
@@ -210,6 +224,7 @@ int main()
 
     HwInterface hw;
     bool hw_ok = init_hardware(hw);
+    std::cout<<"Hardware Initialized\n";
     if (!hw_ok) {
         std::cerr << "Warning: hardware interface could not be opened. Running camera only.\n";
     }
@@ -266,7 +281,7 @@ int main()
 
             // Debug text
             char text[128];
-            std::snprintf(text, sizeof(text), "t: %u %u %u %u  loc:(%.2f, %.2f)",
+            snprintf(text, sizeof(text), "t: %u %u %u %u  loc:(%.2f, %.2f)",
                           mic_delay[0], mic_delay[1], mic_delay[2], mic_delay[3],
                           loc.x_proj, loc.y_proj);
             cv::putText(frame, text, cv::Point(20, 30),
