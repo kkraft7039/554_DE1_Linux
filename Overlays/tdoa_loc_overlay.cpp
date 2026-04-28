@@ -125,7 +125,6 @@ static bool read_mic_delays(HwInterface &hw, uint16_t mic_delay[4])
     }
 
     bytes[byte_idx++] = byte;
-    std::cout << "0x" << std::hex << (int)byte << std::endl;
 
     if (byte_idx < 8) {
         return false;
@@ -142,7 +141,7 @@ static bool read_mic_delays(HwInterface &hw, uint16_t mic_delay[4])
     }
 
     for (int i = 0; i < 4; ++i) {
-        std::cout << i+1 << ": " << mic_delay[i] << " | ";
+        std::cout << i+1 << ": " << static_cast<int>(mic_delay[i]) << " | ";
     }
     std::cout << std::endl;
 
@@ -299,19 +298,9 @@ int main()
             double magnitude = std::sqrt(loc.x_proj * loc.x_proj + loc.y_proj * loc.y_proj);
             double strength = std::max(0.35, std::min(1.0, 0.45 + 0.55 * magnitude));
             draw_heatmap_blob(heatmap, last_center, strength);
-
-            // Debug text
-            char text[128];
-            snprintf(text, sizeof(text), "t: %u %u %u %u  loc:(%.2f, %.2f)",
-                          mic_delay[0], mic_delay[1], mic_delay[2], mic_delay[3],
-                          loc.x_proj, loc.y_proj);
-            cv::putText(frame, text, cv::Point(20, 30),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 1);
         } else {
             // Still redraw a weaker blob at the last known location so it decays smoothly.
             draw_heatmap_blob(heatmap, last_center, 0.20);
-            cv::putText(frame, "No TDOA update", cv::Point(20, 30),
-                        cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 1);
         }
 
         cv::addWeighted(frame, 1.0, heatmap, 0.55, 0.0, displayFrame);
