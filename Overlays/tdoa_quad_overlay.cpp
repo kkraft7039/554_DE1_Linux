@@ -131,7 +131,7 @@ int main() {
     cap.set(CV_CAP_PROP_FRAME_HEIGHT, 600);
 
     cv::namedWindow("Camera Overlay", CV_WINDOW_NORMAL);
-    cv::setWindowProperty("Camera Overlay", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+    // cv::setWindowProperty("Camera Overlay", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
 
     cv::Mat frame;
 
@@ -184,8 +184,8 @@ int main() {
 
         // Define quadrant rectangles.
         cv::Rect rects[5];
-        rects[1] = cv::Rect(w/2, 0,   w - w/2, h/2);     // Top-Right
-        rects[2] = cv::Rect(0,   0,   w/2,     h/2);     // Top-Left
+        rects[1] = cv::Rect(0,   0,   w/2,     h/2);     // Top-Right
+        rects[2] = cv::Rect(w/2, 0,   w - w/2, h/2);     // Top-Left
         rects[3] = cv::Rect(w/2, h/2, w - w/2, h - h/2); // Bottom-Right
         rects[4] = cv::Rect(0,   h/2, w/2,     h - h/2); // Bottom-Left
 
