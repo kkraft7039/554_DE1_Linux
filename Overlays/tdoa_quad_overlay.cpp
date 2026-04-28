@@ -130,7 +130,7 @@ int main() {
     cap.set(CV_CAP_PROP_FRAME_WIDTH, 800);
     cap.set(CV_CAP_PROP_FRAME_HEIGHT, 600);
 
-    cv::namedWindow("Camera Overlay", CV_WINDOW_NORMAL);
+  //  cv::namedWindow("Camera Overlay", CV_WINDOW_NORMAL);
     // cv::setWindowProperty("Camera Overlay", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
 
     cv::Mat frame;
