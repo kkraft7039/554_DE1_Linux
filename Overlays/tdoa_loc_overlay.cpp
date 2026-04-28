@@ -178,6 +178,8 @@ static SoundLocation calculate_sound_origin(uint16_t t1, uint16_t t2,
     if (loc.y_proj > 1.0)  loc.y_proj = 1.0;
     if (loc.y_proj < -1.0) loc.y_proj = -1.0;
 
+    loc.x_proj = -loc.x_proj; // Flip X so positive is right and negative is left.
+
     return loc;
 }
 
