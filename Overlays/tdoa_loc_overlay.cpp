@@ -200,48 +200,48 @@ static cv::Point sound_to_frame_pixel(const SoundLocation &loc, int frame_width,
 
 // Circular heatmap with slight random variation each time it is drawn.
 // 'strength' controls brightness, and the overlay decays between frames.
-static void draw_heatmap_blob(cv::Mat &heatmap, const cv::Point &center, double strength)
-{
-    const int base_radius = 55;
-    const int radius_jitter = (std::rand() % 11) - 5;   // [-5, +5]
-    const int dx_jitter = (std::rand() % 7) - 3;        // [-3, +3]
-    const int dy_jitter = (std::rand() % 7) - 3;        // [-3, +3]
-
-    const int radius = std::max(20, base_radius + radius_jitter);
-    const int cx = center.x + dx_jitter;
-    const int cy = center.y + dy_jitter;
-
-    int x0 = std::max(0, cx - radius);
-    int x1 = std::min(heatmap.cols - 1, cx + radius);
-    int y0 = std::max(0, cy - radius);
-    int y1 = std::min(heatmap.rows - 1, cy + radius);
-
-    for (int y = y0; y <= y1; ++y) {
-        for (int x = x0; x <= x1; ++x) {
-            double dx = (double)(x - cx);
-            double dy = (double)(y - cy);
-            double dist = std::sqrt(dx * dx + dy * dy);
-            if (dist > radius) continue;
-
-            double norm = 1.0 - (dist / (double)radius);
-            double falloff = norm * norm; // soft edge
-
-            cv::Vec3b &pix = heatmap.at<cv::Vec3b>(y, x);
-
-            int blue_add  = (int)(20.0  * falloff * strength);
-            int green_add = (int)(120.0 * falloff * strength);
-            int red_add   = (int)(255.0 * falloff * strength);
-
-            pix[0] = (uchar)std::min(255, (int)pix[0] + blue_add);
-            pix[1] = (uchar)std::min(255, (int)pix[1] + green_add);
-            pix[2] = (uchar)std::min(255, (int)pix[2] + red_add);
-        }
-    }
-}
+//static void draw_heatmap_blob(cv::Mat &heatmap, const cv::Point &center, double strength)
+//{
+//    const int base_radius = 55;
+//    const int radius_jitter = (std::rand() % 11) - 5;   // [-5, +5]
+//    const int dx_jitter = (std::rand() % 7) - 3;        // [-3, +3]
+//    const int dy_jitter = (std::rand() % 7) - 3;        // [-3, +3]
+//
+//    const int radius = std::max(20, base_radius + radius_jitter);
+//    const int cx = center.x + dx_jitter;
+//    const int cy = center.y + dy_jitter;
+//
+//    int x0 = std::max(0, cx - radius);
+//    int x1 = std::min(heatmap.cols - 1, cx + radius);
+//    int y0 = std::max(0, cy - radius);
+//    int y1 = std::min(heatmap.rows - 1, cy + radius);
+//
+//    for (int y = y0; y <= y1; ++y) {
+//        for (int x = x0; x <= x1; ++x) {
+//            double dx = (double)(x - cx);
+//            double dy = (double)(y - cy);
+//            double dist = std::sqrt(dx * dx + dy * dy);
+//            if (dist > radius) continue;
+//
+//            double norm = 1.0 - (dist / (double)radius);
+//            double falloff = norm * norm; // soft edge
+//
+//            cv::Vec3b &pix = heatmap.at<cv::Vec3b>(y, x);
+//
+//            int blue_add  = (int)(20.0  * falloff * strength);
+//            int green_add = (int)(120.0 * falloff * strength);
+//            int red_add   = (int)(255.0 * falloff * strength);
+//
+//            pix[0] = (uchar)std::min(255, (int)pix[0] + blue_add);
+//            pix[1] = (uchar)std::min(255, (int)pix[1] + green_add);
+//            pix[2] = (uchar)std::min(255, (int)pix[2] + red_add);
+//        }
+//    }
+//}
 
 int main()
 {
-    std::srand((unsigned int)std::time(NULL));
+//    std::srand((unsigned int)std::time(NULL));
 
     HwInterface hw;
     bool hw_ok = init_hardware(hw);
@@ -297,10 +297,10 @@ int main()
             // Stronger blob when there is more directional separation.
             double magnitude = std::sqrt(loc.x_proj * loc.x_proj + loc.y_proj * loc.y_proj);
             double strength = std::max(0.35, std::min(1.0, 0.45 + 0.55 * magnitude));
-            draw_heatmap_blob(heatmap, last_center, strength);
+            //draw_heatmap_blob(heatmap, last_center, strength);
         } else {
             // Still redraw a weaker blob at the last known location so it decays smoothly.
-            draw_heatmap_blob(heatmap, last_center, 0.20);
+            //draw_heatmap_blob(heatmap, last_center, 0.20);
         }
 
         cv::addWeighted(frame, 1.0, heatmap, 0.55, 0.0, displayFrame);
