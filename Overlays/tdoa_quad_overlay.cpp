@@ -14,103 +14,103 @@
 #define DIPSW_PIO_OFFSET  0x00010080   // PL -> PS
 
 struct HwInterface {
-    int fd;
-    void *virtual_base;
-    volatile uint32_t *led_pio;
-    volatile uint32_t *dipsw_pio;
-    uint32_t current_req_clk;
+	int fd;
+	void *virtual_base;
+	volatile uint32_t *led_pio;
+	volatile uint32_t *dipsw_pio;
+	uint32_t current_req_clk;
 
-    HwInterface()
-        : fd(-1), virtual_base(MAP_FAILED), led_pio(NULL), dipsw_pio(NULL), current_req_clk(2) {}
+	HwInterface()
+		: fd(-1), virtual_base(MAP_FAILED), led_pio(NULL), dipsw_pio(NULL), current_req_clk(2) {}
 };
 
 static bool get_next_byte(HwInterface &hw,
-                          uint8_t &byte_out)
+		uint8_t &byte_out)
 {
-    static bool waiting = false;
-    uint32_t dipsw_val = *hw.dipsw_pio;
+	static bool waiting = false;
+	uint32_t dipsw_val = *hw.dipsw_pio;
 
-    // Phase 1: request byte
-    if (!waiting) {
-        hw.current_req_clk ^= 0x01;
-        *hw.led_pio = hw.current_req_clk;
-        waiting = true;
-        return false;
-    }
+	// Phase 1: request byte
+	if (!waiting) {
+		hw.current_req_clk ^= 0x01;
+		*hw.led_pio = hw.current_req_clk;
+		waiting = true;
+		return false;
+	}
 
-    // Phase 2: wait for PL ack to match request bit
-    if (((dipsw_val >> 1) & 0x01) != (hw.current_req_clk & 0x01)) {
-        return false;
-    }
+	// Phase 2: wait for PL ack to match request bit
+	if (((dipsw_val >> 1) & 0x01) != (hw.current_req_clk & 0x01)) {
+		return false;
+	}
 
-    // Phase 3: wait for valid/data-ready bit
-    if ((dipsw_val & 0x01) == 0) {
-        return false;
-    }
+	// Phase 3: wait for valid/data-ready bit
+	if ((dipsw_val & 0x01) == 0) {
+		return false;
+	}
 
-    byte_out = (uint8_t)((dipsw_val >> 2) & 0xFF);
+	byte_out = (uint8_t)((dipsw_val >> 2) & 0xFF);
 
-    // Ready for next byte
-    waiting = false;
-    return true;
+	// Ready for next byte
+	waiting = false;
+	return true;
 }
 
 static bool init_hardware(HwInterface &hw)
 {
-    hw.fd = open("/dev/mem", O_RDWR | O_SYNC);
-    if (hw.fd < 0) {
-        perror("open /dev/mem");
-        return false;
-    }
+	hw.fd = open("/dev/mem", O_RDWR | O_SYNC);
+	if (hw.fd < 0) {
+		perror("open /dev/mem");
+		return false;
+	}
 
-    hw.virtual_base = mmap(NULL, HW_REGS_SPAN, PROT_READ | PROT_WRITE,
-                           MAP_SHARED, hw.fd, HW_REGS_BASE);
-    if (hw.virtual_base == MAP_FAILED) {
-        perror("mmap");
-        close(hw.fd);
-        hw.fd = -1;
-        return false;
-    }
+	hw.virtual_base = mmap(NULL, HW_REGS_SPAN, PROT_READ | PROT_WRITE,
+			MAP_SHARED, hw.fd, HW_REGS_BASE);
+	if (hw.virtual_base == MAP_FAILED) {
+		perror("mmap");
+		close(hw.fd);
+		hw.fd = -1;
+		return false;
+	}
 
-    hw.led_pio   = (volatile uint32_t *)((uint8_t *)hw.virtual_base + LED_PIO_OFFSET);
-    hw.dipsw_pio = (volatile uint32_t *)((uint8_t *)hw.virtual_base + DIPSW_PIO_OFFSET);
+	hw.led_pio   = (volatile uint32_t *)((uint8_t *)hw.virtual_base + LED_PIO_OFFSET);
+	hw.dipsw_pio = (volatile uint32_t *)((uint8_t *)hw.virtual_base + DIPSW_PIO_OFFSET);
 
-    hw.current_req_clk = 2;
-    *hw.led_pio = hw.current_req_clk;
-    return true;
+	hw.current_req_clk = 2;
+	*hw.led_pio = hw.current_req_clk;
+	return true;
 }
 
 static void close_hardware(HwInterface &hw)
 {
-    if (hw.led_pio) {
-        hw.current_req_clk &= 0x01;
-        *hw.led_pio = hw.current_req_clk;
-    }
+	if (hw.led_pio) {
+		hw.current_req_clk &= 0x01;
+		*hw.led_pio = hw.current_req_clk;
+	}
 
-    if (hw.virtual_base != MAP_FAILED) {
-        munmap(hw.virtual_base, HW_REGS_SPAN);
-        hw.virtual_base = MAP_FAILED;
-    }
-    if (hw.fd >= 0) {
-        close(hw.fd);
-        hw.fd = -1;
-    }
+	if (hw.virtual_base != MAP_FAILED) {
+		munmap(hw.virtual_base, HW_REGS_SPAN);
+		hw.virtual_base = MAP_FAILED;
+	}
+	if (hw.fd >= 0) {
+		close(hw.fd);
+		hw.fd = -1;
+	}
 
-    hw.led_pio = NULL;
-    hw.dipsw_pio = NULL;
+	hw.led_pio = NULL;
+	hw.dipsw_pio = NULL;
 }
 
 static uint8_t read_quadrant(HwInterface &hw)
 {
-    if (!hw.led_pio || !hw.dipsw_pio) return 0;
+	if (!hw.led_pio || !hw.dipsw_pio) return 0;
 
-    uint8_t byte;
-    if (!get_next_byte(hw, byte)) {
-        return 0;
-    }
+	uint8_t byte;
+	if (!get_next_byte(hw, byte)) {
+		return 0;
+	}
 
-    if (byte > 4) return 0;
-    return byte;
+	if (byte > 4) return 0;
+	return byte;
 }
 
 int main() {
