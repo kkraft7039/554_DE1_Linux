@@ -114,7 +114,7 @@ static void close_hardware(HwInterface &hw)
 // Reads 2x16-bit mic pos values using the same byte handshake.
 // Assumes the PL is presenting:
 //   mic_pos_y LSB, mic_pos_y MSB, mic_pos_x LSB, mic_pos_x MSB
-static bool read_mic_pos(HwInterface &hw, uint16_t mic_pos[2])
+static bool read_mic_pos(HwInterface &hw, int16_t mic_pos[2])
 {
     static uint8_t bytes[4];
     static int byte_idx = 0;
@@ -137,11 +137,11 @@ static bool read_mic_pos(HwInterface &hw, uint16_t mic_pos[2])
     for (int i = 1; i >= 0; --i) {
         uint8_t lsb = bytes[k++];
         uint8_t msb = bytes[k++];
-        mic_pos[i] = (uint16_t)((msb << 8) | lsb);
+        mic_pos[i] = (int16_t)((msb << 8) | lsb);
     }
 
     for (int i = 0; i < 2; ++i) {
-        std::cout << i+1 << ": " << static_cast<int>(mic_delay[i]) << " | ";
+        std::cout << i+1 << ": " << static_cast<int>(mic_pos[i]) << " | ";
     }
     std::cout << std::endl;
 
@@ -150,7 +150,7 @@ static bool read_mic_pos(HwInterface &hw, uint16_t mic_pos[2])
 
 // t1 = Mic pos x_cord in Q1.15 format
 // y_q15 = Mic pos y_cord in Q1.15 format
-static SoundLocation conv_coord_to_double(uint16_t x_q15, uint16_t y_q15)
+static SoundLocation conv_coord_to_double(int16_t x_q15, int16_t y_q15)
 {
     SoundLocation loc;
     const double SCALE_FACTOR = 32768.0;
@@ -164,7 +164,7 @@ static SoundLocation conv_coord_to_double(uint16_t x_q15, uint16_t y_q15)
 static cv::Point sound_to_frame_pixel(const SoundLocation &loc, int frame_width, int frame_height)
 {
     int x = (int)(((loc.x_proj + 1.0) * 0.5) * (frame_width  - 1));
-    int y = (int)(((-loc.y_proj + 1.0) * 0.5) * (frame_height - 1));
+    int y = (int)(((loc.y_proj + 1.0) * 0.5) * (frame_height - 1));
 
     x = std::max(0, std::min(frame_width  - 1, x));
     y = std::max(0, std::min(frame_height - 1, y));
@@ -174,44 +174,44 @@ static cv::Point sound_to_frame_pixel(const SoundLocation &loc, int frame_width,
 
 // Circular heatmap with slight random variation each time it is drawn.
 // 'strength' controls brightness, and the overlay decays between frames.
-//static void draw_heatmap_blob(cv::Mat &heatmap, const cv::Point &center, double strength)
-//{
-//    const int base_radius = 55;
-//    const int radius_jitter = (std::rand() % 11) - 5;   // [-5, +5]
-//    const int dx_jitter = (std::rand() % 7) - 3;        // [-3, +3]
-//    const int dy_jitter = (std::rand() % 7) - 3;        // [-3, +3]
-//
-//    const int radius = std::max(20, base_radius + radius_jitter);
-//    const int cx = center.x + dx_jitter;
-//    const int cy = center.y + dy_jitter;
-//
-//    int x0 = std::max(0, cx - radius);
-//    int x1 = std::min(heatmap.cols - 1, cx + radius);
-//    int y0 = std::max(0, cy - radius);
-//    int y1 = std::min(heatmap.rows - 1, cy + radius);
-//
-//    for (int y = y0; y <= y1; ++y) {
-//        for (int x = x0; x <= x1; ++x) {
-//            double dx = (double)(x - cx);
-//            double dy = (double)(y - cy);
-//            double dist = std::sqrt(dx * dx + dy * dy);
-//            if (dist > radius) continue;
-//
-//            double norm = 1.0 - (dist / (double)radius);
-//            double falloff = norm * norm; // soft edge
-//
-//            cv::Vec3b &pix = heatmap.at<cv::Vec3b>(y, x);
-//
-//            int blue_add  = (int)(20.0  * falloff * strength);
-//            int green_add = (int)(120.0 * falloff * strength);
-//            int red_add   = (int)(255.0 * falloff * strength);
-//
-//            pix[0] = (uchar)std::min(255, (int)pix[0] + blue_add);
-//            pix[1] = (uchar)std::min(255, (int)pix[1] + green_add);
-//            pix[2] = (uchar)std::min(255, (int)pix[2] + red_add);
-//        }
-//    }
-//}
+static void draw_heatmap_blob(cv::Mat &heatmap, const cv::Point &center, double strength)
+{
+    const int base_radius = 55;
+    const int radius_jitter = (std::rand() % 11) - 5;   // [-5, +5]
+    const int dx_jitter = (std::rand() % 7) - 3;        // [-3, +3]
+    const int dy_jitter = (std::rand() % 7) - 3;        // [-3, +3]
+
+    const int radius = std::max(20, base_radius + radius_jitter);
+    const int cx = center.x + dx_jitter;
+    const int cy = center.y + dy_jitter;
+
+    int x0 = std::max(0, cx - radius);
+    int x1 = std::min(heatmap.cols - 1, cx + radius);
+    int y0 = std::max(0, cy - radius);
+    int y1 = std::min(heatmap.rows - 1, cy + radius);
+
+    for (int y = y0; y <= y1; ++y) {
+        for (int x = x0; x <= x1; ++x) {
+            double dx = (double)(x - cx);
+            double dy = (double)(y - cy);
+            double dist = std::sqrt(dx * dx + dy * dy);
+            if (dist > radius) continue;
+
+            double norm = 1.0 - (dist / (double)radius);
+            double falloff = norm * norm; // soft edge
+
+            cv::Vec3b &pix = heatmap.at<cv::Vec3b>(y, x);
+
+            int blue_add  = (int)(20.0  * falloff * strength);
+            int green_add = (int)(120.0 * falloff * strength);
+            int red_add   = (int)(255.0 * falloff * strength);
+
+            pix[0] = (uchar)std::min(255, (int)pix[0] + blue_add);
+            pix[1] = (uchar)std::min(255, (int)pix[1] + green_add);
+            pix[2] = (uchar)std::min(255, (int)pix[2] + red_add);
+        }
+    }
+}
 
 int main()
 {
@@ -257,7 +257,7 @@ int main()
         // Fade old heatmap slightly every frame.
         heatmap.convertTo(heatmap, -1, 0.92, 0.0);
 
-        uint16_t mic_pos[2] = {0, 0};
+        int16_t mic_pos[2] = {0, 0};
         bool got_pos = false;
 
         if (hw_ok) {
@@ -271,10 +271,10 @@ int main()
             // Stronger blob when there is more directional separation.
             double magnitude = std::sqrt(loc.x_proj * loc.x_proj + loc.y_proj * loc.y_proj);
             double strength = std::max(0.35, std::min(1.0, 0.45 + 0.55 * magnitude));
-            //draw_heatmap_blob(heatmap, last_center, strength);
+            draw_heatmap_blob(heatmap, last_center, strength);
         } else {
             // Still redraw a weaker blob at the last known location so it decays smoothly.
-            //draw_heatmap_blob(heatmap, last_center, 0.20);
+            draw_heatmap_blob(heatmap, last_center, 0.20);
         }
 
         cv::addWeighted(frame, 1.0, heatmap, 0.55, 0.0, displayFrame);
