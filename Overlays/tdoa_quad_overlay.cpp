@@ -14,209 +14,214 @@
 #define DIPSW_PIO_OFFSET  0x00010080   // PL -> PS
 
 struct HwInterface {
-    int fd;
-    void *virtual_base;
-    volatile uint32_t *led_pio;
-    volatile uint32_t *dipsw_pio;
-    uint32_t current_req_clk;
+	int fd;
+	void *virtual_base;
+	volatile uint32_t *led_pio;
+	volatile uint32_t *dipsw_pio;
+	uint32_t current_req_clk;
 
-    HwInterface()
-        : fd(-1), virtual_base(MAP_FAILED), led_pio(NULL), dipsw_pio(NULL), current_req_clk(2) {}
+	HwInterface()
+		: fd(-1), virtual_base(MAP_FAILED), led_pio(NULL), dipsw_pio(NULL), current_req_clk(2) {}
 };
 
 static bool get_next_byte(HwInterface &hw,
-                          uint8_t &byte_out)
+		uint8_t &byte_out)
 {
-    static bool waiting = false;
-    uint32_t dipsw_val = *hw.dipsw_pio;
+	static bool waiting = false;
+	uint32_t dipsw_val = *hw.dipsw_pio;
 
-    // Phase 1: request byte
-    if (!waiting) {
-        hw.current_req_clk ^= 0x01;
-        *hw.led_pio = hw.current_req_clk;
-        waiting = true;
-        return false;
-    }
+	// Phase 1: request byte
+	if (!waiting) {
+		hw.current_req_clk ^= 0x01;
+		*hw.led_pio = hw.current_req_clk;
+		waiting = true;
+		return false;
+	}
 
-    // Phase 2: wait for PL ack to match request bit
-    if (((dipsw_val >> 1) & 0x01) != (hw.current_req_clk & 0x01)) {
-        return false;
-    }
+	// Phase 2: wait for PL ack to match request bit
+	if (((dipsw_val >> 1) & 0x01) != (hw.current_req_clk & 0x01)) {
+		return false;
+	}
 
-    // Phase 3: wait for valid/data-ready bit
-    if ((dipsw_val & 0x01) == 0) {
-        return false;
-    }
+	// Phase 3: wait for valid/data-ready bit
+	if ((dipsw_val & 0x01) == 0) {
+		return false;
+	}
 
-    byte_out = (uint8_t)((dipsw_val >> 2) & 0xFF);
+	byte_out = (uint8_t)((dipsw_val >> 2) & 0xFF);
 
-    // Ready for next byte
-    waiting = false;
-    return true;
+	// Ready for next byte
+	waiting = false;
+	return true;
 }
 
 static bool init_hardware(HwInterface &hw)
 {
-    hw.fd = open("/dev/mem", O_RDWR | O_SYNC);
-    if (hw.fd < 0) {
-        perror("open /dev/mem");
-        return false;
-    }
+	hw.fd = open("/dev/mem", O_RDWR | O_SYNC);
+	if (hw.fd < 0) {
+		perror("open /dev/mem");
+		return false;
+	}
 
-    hw.virtual_base = mmap(NULL, HW_REGS_SPAN, PROT_READ | PROT_WRITE,
-                           MAP_SHARED, hw.fd, HW_REGS_BASE);
-    if (hw.virtual_base == MAP_FAILED) {
-        perror("mmap");
-        close(hw.fd);
-        hw.fd = -1;
-        return false;
-    }
+	hw.virtual_base = mmap(NULL, HW_REGS_SPAN, PROT_READ | PROT_WRITE,
+			MAP_SHARED, hw.fd, HW_REGS_BASE);
+	if (hw.virtual_base == MAP_FAILED) {
+		perror("mmap");
+		close(hw.fd);
+		hw.fd = -1;
+		return false;
+	}
 
-    hw.led_pio   = (volatile uint32_t *)((uint8_t *)hw.virtual_base + LED_PIO_OFFSET);
-    hw.dipsw_pio = (volatile uint32_t *)((uint8_t *)hw.virtual_base + DIPSW_PIO_OFFSET);
+	hw.led_pio   = (volatile uint32_t *)((uint8_t *)hw.virtual_base + LED_PIO_OFFSET);
+	hw.dipsw_pio = (volatile uint32_t *)((uint8_t *)hw.virtual_base + DIPSW_PIO_OFFSET);
 
-    hw.current_req_clk = 2;
-    *hw.led_pio = hw.current_req_clk;
-    return true;
+	hw.current_req_clk = 2;
+	*hw.led_pio = hw.current_req_clk;
+	return true;
 }
 
 static void close_hardware(HwInterface &hw)
 {
-    if (hw.led_pio) {
-        hw.current_req_clk &= 0x01;
-        *hw.led_pio = hw.current_req_clk;
-    }
+	if (hw.led_pio) {
+		hw.current_req_clk &= 0x01;
+		*hw.led_pio = hw.current_req_clk;
+	}
 
-    if (hw.virtual_base != MAP_FAILED) {
-        munmap(hw.virtual_base, HW_REGS_SPAN);
-        hw.virtual_base = MAP_FAILED;
-    }
-    if (hw.fd >= 0) {
-        close(hw.fd);
-        hw.fd = -1;
-    }
+	if (hw.virtual_base != MAP_FAILED) {
+		munmap(hw.virtual_base, HW_REGS_SPAN);
+		hw.virtual_base = MAP_FAILED;
+	}
+	if (hw.fd >= 0) {
+		close(hw.fd);
+		hw.fd = -1;
+	}
 
-    hw.led_pio = NULL;
-    hw.dipsw_pio = NULL;
+	hw.led_pio = NULL;
+	hw.dipsw_pio = NULL;
 }
 
 static uint8_t read_quadrant(HwInterface &hw)
 {
-    if (!hw.led_pio || !hw.dipsw_pio) return 0;
+	if (!hw.led_pio || !hw.dipsw_pio) return 0;
 
-    uint8_t byte;
-    if (!get_next_byte(hw, byte)) {
-        return 0;
-    }
+	uint8_t byte;
+	if (!get_next_byte(hw, byte)) {
+		return 0;
+	}
 
-    if (byte > 4) return 0;
-    return byte;
+	if (byte > 4) return 0;
+	return byte;
 }
 
 int main() {
-    HwInterface hw;
-    bool hw_ok = init_hardware(hw);
-    if (!hw_ok) {
-        std::cerr << "Warning: hardware interface could not be opened. Keyboard test mode only.\n";
-    }
+	HwInterface hw;
+	bool hw_ok = init_hardware(hw);
+	if (!hw_ok) {
+		std::cerr << "Warning: hardware interface could not be opened. Keyboard test mode only.\n";
+	}
 
-    cv::VideoCapture cap(0);  // /dev/video0
-    if (!cap.isOpened()) {
-        std::cerr << "Error: could not open camera\n";
-        close_hardware(hw);
-        return 1;
-    }
+	cv::VideoCapture cap(0);  // /dev/video0
+	if (!cap.isOpened()) {
+		std::cerr << "Error: could not open camera\n";
+		close_hardware(hw);
+		return 1;
+	}
 
-    cap.set(CV_CAP_PROP_FRAME_WIDTH, 800);
-    cap.set(CV_CAP_PROP_FRAME_HEIGHT, 600);
+	cap.set(CV_CAP_PROP_FRAME_WIDTH, 800);
+	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 600);
 
-    cv::namedWindow("Camera Overlay", CV_WINDOW_NORMAL);
-    // cv::setWindowProperty("Camera Overlay", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+	cv::namedWindow("Camera Overlay", CV_WINDOW_NORMAL);
+	// cv::setWindowProperty("Camera Overlay", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
 
-    cv::Mat frame;
+	cv::Mat frame;
 
 
-    // Fade strength for each quadrant:
-    // 1 = top-right, 2 = top-left, 3 = bottom-right, 4 = bottom-left
-    float quadFade[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+	// Fade strength for each quadrant:
+	// 1 = top-right, 2 = top-left, 3 = bottom-right, 4 = bottom-left
+	float quadFade[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
-    while (true) {
-        if (!cap.read(frame) || frame.empty()) {
-            std::cerr << "Error: failed to read frame\n";
-            break;
-        }
+		if (!cap.read(frame) || frame.empty()) {
+			std::cerr << "Error: failed to read frame\n";
+		}
+	int w = frame.cols;
+	int h = frame.rows;
+	
+	int half_w = w/2;
+	int half_h = h/2;
 
-        /*
-        Get sound location from PL/TDOA hardware and show corresponding quadrant on the overlay.
+		// Define quadrant rectangles.
+		cv::Rect rects[5];
+		rects[1] = cv::Rect(0,   0, half_w,     half_h);     // Top-Right
+		rects[2] = cv::Rect(half_w, 0,   w - half_w, half_h);     // Top-Left
+		rects[3] = cv::Rect(half_w, half_h, w - half_w, h - half_h); // Bottom-Right
+		rects[4] = cv::Rect(0,   half_h, half_w,     h - half_h); // Bottom-Left
+	while (true) {
+		if (!cap.read(frame) || frame.empty()) {
+			std::cerr << "Error: failed to read frame\n";
+			break;
+		}
 
-        tdoaQuadrant = 0; // Unknown/No Sound
-        tdoaQuadrant = 1; // Top-Right
-        tdoaQuadrant = 2; // Top-Left
-        tdoaQuadrant = 3; // Bottom-Right
-        tdoaQuadrant = 4; // Bottom-Left
-        */
-        int tdoaQuadrant = 0;
+		/*
+		   Get sound location from PL/TDOA hardware and show corresponding quadrant on the overlay.
 
-        // Read live hardware first.
-        if (hw_ok) {
-            tdoaQuadrant = (int)read_quadrant(hw);
-        }
+		   tdoaQuadrant = 0; // Unknown/No Sound
+		   tdoaQuadrant = 1; // Top-Right
+		   tdoaQuadrant = 2; // Top-Left
+		   tdoaQuadrant = 3; // Bottom-Right
+		   tdoaQuadrant = 4; // Bottom-Left
+		 */
+		int tdoaQuadrant = 0;
 
-        // Keyboard fallback for testing.
-        char key = (char)cv::waitKey(1);
-        if (key == '1') tdoaQuadrant = 1;
-        if (key == '2') tdoaQuadrant = 2;
-        if (key == '3') tdoaQuadrant = 3;
-        if (key == '4') tdoaQuadrant = 4;
-        if (key == 27 || key == 'q') break;
+		// Read live hardware first.
+		if (hw_ok) {
+			tdoaQuadrant = (int)read_quadrant(hw);
+		}
 
-        // If a pulse is detected, reset that quadrant fade to full.
-        if (tdoaQuadrant >= 1 && tdoaQuadrant <= 4) {
-            quadFade[tdoaQuadrant] = 1.0f;
-        }
+		// Keyboard fallback for testing.
+		//        char key = (char)cv::waitKey(1);
+		//        if (key == '1') tdoaQuadrant = 1;
+		//        if (key == '2') tdoaQuadrant = 2;
+		//        if (key == '3') tdoaQuadrant = 3;
+		//        if (key == '4') tdoaQuadrant = 4;
+		//        if (key == 27 || key == 'q') break;
 
-        // Create overlay.
-        cv::Mat overlay;
-        frame.copyTo(overlay);
+		// If a pulse is detected, reset that quadrant fade to full.
+		if (tdoaQuadrant >= 1 && tdoaQuadrant <= 4) {
+			quadFade[tdoaQuadrant] = 1.0f;
+		}
 
-        int w = frame.cols;
-        int h = frame.rows;
+		// Create overlay.
+		cv::Mat overlay;
+		frame.copyTo(overlay);
 
-        // Define quadrant rectangles.
-        cv::Rect rects[5];
-        rects[1] = cv::Rect(0,   0,   w/2,     h/2);     // Top-Right
-        rects[2] = cv::Rect(w/2, 0,   w - w/2, h/2);     // Top-Left
-        rects[3] = cv::Rect(w/2, h/2, w - w/2, h - h/2); // Bottom-Right
-        rects[4] = cv::Rect(0,   h/2, w/2,     h - h/2); // Bottom-Left
+		// Draw only the strongest currently active quadrant.
+		int activeQuad = 0;
+		float maxFade = 0.0f;
+		for (int i = 1; i <= 4; i++) {
+			if (quadFade[i] > maxFade) {
+				maxFade = quadFade[i];
+				activeQuad = i;
+			}
+		}
 
-        // Draw only the strongest currently active quadrant.
-        int activeQuad = 0;
-        float maxFade = 0.0f;
-        for (int i = 1; i <= 4; i++) {
-            if (quadFade[i] > maxFade) {
-                maxFade = quadFade[i];
-                activeQuad = i;
-            }
-        }
+		if (activeQuad != 0 && maxFade > 0.01f) {
+			cv::rectangle(overlay, rects[activeQuad], CV_RGB(0, 255, 0), CV_FILLED);
 
-        if (activeQuad != 0 && maxFade > 0.01f) {
-            cv::rectangle(overlay, rects[activeQuad], CV_RGB(0, 255, 0), CV_FILLED);
+			double alpha = 0.35 * maxFade;
+			cv::addWeighted(overlay, alpha, frame, 1.0 - alpha, 0.0, frame);
+		}
 
-            double alpha = 0.35 * maxFade;
-            cv::addWeighted(overlay, alpha, frame, 1.0 - alpha, 0.0, frame);
-        }
+		// Fade out slowly.
+		for (int i = 1; i <= 4; i++) {
+			quadFade[i] -= 0.02f;
+			if (quadFade[i] < 0.0f) quadFade[i] = 0.0f;
+		}
 
-        // Fade out slowly.
-        for (int i = 1; i <= 4; i++) {
-            quadFade[i] -= 0.02f;
-            if (quadFade[i] < 0.0f) quadFade[i] = 0.0f;
-        }
+		cv::imshow("Camera Overlay", frame);
+	}
 
-        cv::imshow("Camera Overlay", frame);
-    }
-
-    cap.release();
-    close_hardware(hw);
-    cv::destroyAllWindows();
-    return 0;
+	cap.release();
+	close_hardware(hw);
+	cv::destroyAllWindows();
+	return 0;
 }
