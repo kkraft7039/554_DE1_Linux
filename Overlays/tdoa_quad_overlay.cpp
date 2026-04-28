@@ -24,25 +24,35 @@ struct HwInterface {
         : fd(-1), virtual_base(MAP_FAILED), led_pio(NULL), dipsw_pio(NULL), current_req_clk(2) {}
 };
 
-static uint8_t get_next_byte(volatile uint32_t *led_pio,
-                             volatile uint32_t *dipsw_pio,
-                             uint32_t *current_req)
+static bool get_next_byte(HwInterface &hw,
+                          uint8_t &byte_out)
 {
-    *current_req ^= 0x01;
-    *led_pio = *current_req;
+    static bool waiting = false;
+    uint32_t dipsw_val = *hw.dipsw_pio;
 
-    uint32_t dipsw_val;
-    do {
-        dipsw_val = *dipsw_pio;
-    } while (((dipsw_val >> 1) & 0x01) != (*current_req & 0x01));
+    // Phase 1: request byte
+    if (!waiting) {
+        hw.current_req_clk ^= 0x01;
+        *hw.led_pio = hw.current_req_clk;
+        waiting = true;
+        return false;
+    }
 
-    do {
-        dipsw_val = *dipsw_pio;
-    } while ((dipsw_val & 0x01) == 0);
+    // Phase 2: wait for PL ack to match request bit
+    if (((dipsw_val >> 1) & 0x01) != (hw.current_req_clk & 0x01)) {
+        return false;
+    }
 
-    usleep(1);
-    dipsw_val = *dipsw_pio;
-    return (uint8_t)((dipsw_val >> 2) & 0xFF);
+    // Phase 3: wait for valid/data-ready bit
+    if ((dipsw_val & 0x01) == 0) {
+        return false;
+    }
+
+    byte_out = (uint8_t)((dipsw_val >> 2) & 0xFF);
+
+    // Ready for next byte
+    waiting = false;
+    return true;
 }
 
 static bool init_hardware(HwInterface &hw)
@@ -94,11 +104,13 @@ static uint8_t read_quadrant(HwInterface &hw)
 {
     if (!hw.led_pio || !hw.dipsw_pio) return 0;
 
-    uint8_t quad = get_next_byte(hw.led_pio, hw.dipsw_pio, &hw.current_req_clk);
-    uint8_t garb = get_next_byte(hw.led_pio, hw.dipsw_pio, &hw.current_req_clk);
+    uint8_t byte;
+    if (!get_next_byte(hw, byte)) {
+        return 0;
+    }
 
-    if (quad > 4) return 0;
-    return quad;
+    if (byte > 4) return 0;
+    return byte;
 }
 
 int main() {
