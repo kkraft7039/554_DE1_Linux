@@ -125,7 +125,7 @@ static bool read_mic_delays(HwInterface &hw, uint16_t mic_delay[4])
     }
 
     bytes[byte_idx++] = byte;
-    std::cout << std::hex << std::setfill(0) << std::setw(2) << (int)byte << "\n";
+    std::cout << "0x" << std::hex << (int)byte << std::endl;
 
     if (byte_idx < 8) {
         return false;
