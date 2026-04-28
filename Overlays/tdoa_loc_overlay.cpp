@@ -141,9 +141,9 @@ static bool read_mic_delays(HwInterface &hw, uint16_t mic_delay[4])
     }
 
     for (int i = 0; i < 4; ++i) {
-        std::cout << i+1 << ": " << static_cast<int>(mic_delay[i]) << " | ";
+    //    std::cout << i+1 << ": " << static_cast<int>(mic_delay[i]) << " | ";
     }
-    std::cout << std::endl;
+    //std::cout << std::endl;
 
     return true;
 }
