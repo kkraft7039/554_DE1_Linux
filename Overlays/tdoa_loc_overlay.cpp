@@ -141,6 +141,11 @@ static bool read_mic_delays(HwInterface &hw, uint16_t mic_delay[4])
         mic_delay[i] = (uint16_t)((msb << 8) | lsb);
     }
 
+    for (int i = 0; i < 4; ++i) {
+        std::cout << i+1 << ": " << mic_delay[i] << " | ";
+    }
+    std::cout << std::endl;
+
     return true;
 }
 
