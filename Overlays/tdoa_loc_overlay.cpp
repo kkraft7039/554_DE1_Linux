@@ -217,7 +217,7 @@ static SoundLocation calculate_sound_origin(uint16_t t1, uint16_t t2,
 static cv::Point sound_to_frame_pixel(const SoundLocation &loc, int frame_width, int frame_height)
 {
     int x = (int)(((loc.x_proj + 1.0) * 0.5) * (frame_width  - 1));
-    int y = (int)(((-loc.y_proj + 1.0) * 0.5) * (frame_height - 1));
+    int y = (int)(((loc.y_proj + 1.0) * 0.5) * (frame_height - 1));
 
     x = std::max(0, std::min(frame_width  - 1, x));
     y = std::max(0, std::min(frame_height - 1, y));
