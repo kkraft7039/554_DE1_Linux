@@ -427,12 +427,10 @@ static void draw_heatmap_blob(cv::Mat &heatmap, const cv::Point &center, double 
 {
     const int base_radius = 55;
     const int radius_jitter = (std::rand() % 11) - 5;   // [-5, +5]
-    const int dx_jitter = (std::rand() % 7) - 3;        // [-3, +3]
-    const int dy_jitter = (std::rand() % 7) - 3;        // [-3, +3]
 
     const int radius = std::max(20, base_radius + radius_jitter);
-    const int cx = center.x + dx_jitter;
-    const int cy = center.y + dy_jitter;
+    const int cx = center.x;
+    const int cy = center.y;
 
     int x0 = std::max(0, cx - radius);
     int x1 = std::min(heatmap.cols - 1, cx + radius);
@@ -527,11 +525,7 @@ int main()
         heatmap.convertTo(heatmap, -1, 0.92, 0.0);
 
         uint16_t mic_delay[4] = {0, 0, 0, 0};
-        bool got_delays = false;
-
-        if (hw_ok) {
-            got_delays = read_mic_delays(hw, mic_delay);
-        }
+        bool got_delays = hw_ok && read_mic_delays(hw, mic_delay);
 
         if (got_delays) {
             // SoundLocation loc = calculate_sound_origin(mic_delay[0], mic_delay[1], mic_delay[2], mic_delay[3]);
@@ -545,7 +539,7 @@ int main()
                 std::cout << "Z: " << loc3d.Z << " meters" << std::endl;
             }
             
-            //last_center = sound_to_frame_pixel(loc, frame.cols, frame.rows);
+            // last_center = sound_to_frame_pixel(loc, frame.cols, frame.rows);
             // last_center = loc3d_to_frame_pixel(loc3d, frame.cols, frame.rows);
             
             objectPoints[0] = cv::Point3f(loc3d.X, loc3d.Y, loc3d.Z);
@@ -562,9 +556,6 @@ int main()
             double magnitude = std::sqrt(loc3d.X * loc3d.X + loc3d.Y * loc3d.Y + loc3d.Z * loc3d.Z); 
             double strength = std::max(0.35, std::min(1.0, 0.45 + 0.55 * magnitude));
             draw_heatmap_blob(heatmap, last_center, strength);
-        } else {
-            // Still redraw a weaker blob at the last known location so it decays smoothly.
-            draw_heatmap_blob(heatmap, last_center, 0.20);
         }
 
         cv::addWeighted(frame, 1.0, heatmap, 0.55, 0.0, displayFrame);
