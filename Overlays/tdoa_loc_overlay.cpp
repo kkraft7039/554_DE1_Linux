@@ -560,9 +560,6 @@ int main()
 
         cv::addWeighted(frame, 1.0, heatmap, 0.55, 0.0, displayFrame);
 
-        // Optional marker at the estimated center.
-        cv::circle(displayFrame, last_center, 5, cv::Scalar(255, 255, 255), -1);
-
         cv::imshow("Camera Overlay", displayFrame);
 
         char key = (char)cv::waitKey(1);
