@@ -507,7 +507,7 @@ int main()
     cv::Mat rvec = (cv::Mat_<double>(3,1) << 3.1415926535, 0.0, 0.0); 
     
     // Translation: X=0 (centered), Y=Offset (meters), Z=0 (same plane)
-    cv::Mat tvec = (cv::Mat_<double>(3,1) << 0.0, camera_y_offset_meters, 0.0);
+    cv::Mat tvec = (cv::Mat_<double>(3,1) << 0.0, 0.0, 0.0);
 
     std::vector<cv::Point3f> objectPoints(1);
     std::vector<cv::Point2f> imagePoints(1);
