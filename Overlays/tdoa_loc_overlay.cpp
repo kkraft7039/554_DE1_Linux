@@ -517,6 +517,9 @@ int main()
         -0.34706542, 
         1.35788056
     );
+
+    std::vector<cv::Point3f> objectPoints(1);
+    std::vector<cv::Point2f> imagePoints(1);
     
     while (true) {
         if (!cap.read(frame) || frame.empty()) {
@@ -554,8 +557,8 @@ int main()
             //last_center = sound_to_frame_pixel(loc, frame.cols, frame.rows);
             // last_center = loc3d_to_frame_pixel(loc3d, frame.cols, frame.rows);
             
-            std::vector<cv::Point3f> objectPoints = { cv::Point3f(loc3d.X, loc3d.Y, loc3d.Z) };
-
+            objectPoints[0] = cv::Point3f(loc3d.X, loc3d.Y, loc3d.Z);
+            
             // The Projection
             cv::projectPoints(objectPoints, rvec, tvec, mtx, dist, imagePoints);
             last_center = cv::Point(imagePoints[0].x, imagePoints[0].y);
