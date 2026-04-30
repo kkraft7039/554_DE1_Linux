@@ -38,7 +38,7 @@ struct HwInterface {
 };
 
 // Same byte reader as fast_pcm_file_write.c
-static bool get_next_byte_unblocking(HwInterface &hw,
+static bool get_next_byte(HwInterface &hw,
                           uint8_t &byte_out)
 {
     static bool waiting = false;
@@ -66,33 +66,6 @@ static bool get_next_byte_unblocking(HwInterface &hw,
 
     // Ready for next byte
     waiting = false;
-    return true;
-}
-
-// Same byte reader as fast_pcm_file_write.c
-static bool get_next_byte_blocking(HwInterface &hw,
-                          uint8_t &byte_out)
-{
-    uint32_t dipsw_val = *hw.dipsw_pio;
-
-    // Phase 1: request byte
-    hw.current_req_clk ^= 0x01;
-    *hw.led_pio = hw.current_req_clk;
-
-    // Phase 2: wait for PL ack to match request bit
-    do { 
-        dipsw_val = *hw.dipsw_pio;
-    } while (((dipsw_val >> 1) & 0x01) != (hw.current_req_clk & 0x01));
-
-    // Phase 3: wait for valid/data-ready bit
-    do {
-        dipsw_val = *hw.dipsw_pio; 
-    } while ((dipsw_val & 0x01) == 0);
-
-    usleep(1);
-    byte_out = (uint8_t)((dipsw_val >> 2) & 0xFF);
-
-    // Ready for next byte
     return true;
 }
 
@@ -138,86 +111,60 @@ static void close_hardware(HwInterface &hw)
     }
 }
 
-// Reads 4x16-bit mic delay/timestamp values using the same byte handshake.
+// Reads 2x16-bit mic pos values using the same byte handshake.
 // Assumes the PL is presenting:
-//   mic3 LSB, mic3 MSB, mic2 LSB, mic2 MSB, mic1 LSB, mic1 MSB, mic0 LSB, mic0 MSB
-static bool read_mic_delays(HwInterface &hw, uint16_t mic_delay[4])
+//   mic_pos_y LSB, mic_pos_y MSB, mic_pos_x LSB, mic_pos_x MSB
+static bool read_mic_pos(HwInterface &hw, int16_t mic_pos[2])
 {
-    static uint8_t bytes[8];
+    static uint8_t bytes[4];
+    static int byte_idx = 0;
 
     uint8_t byte;
-    if (!get_next_byte_unblocking(hw, byte)) {
+    if (!get_next_byte(hw, byte)) {
         return false;
     }
 
-    bytes[0] = byte;
+    bytes[byte_idx++] = byte;
 
-    for (int i = 1; i < 8; ++i) {
-        if (!get_next_byte_blocking(hw, byte)) {
-            return false;
-        }
-        bytes[i] = byte;
+    if (byte_idx < 4) {
+        return false;
     }
 
-    // PL sends: mic3 LSB, mic3 MSB, mic2 LSB, mic2 MSB, ...
+    byte_idx = 0;
+
+    // PL sends: mic_pos_y LSB, mic_pos_y MSB, mic_pos_x LSB, mic_pos_x MSB...
     int k = 0;
-    for (int i = 3; i >= 0; --i) {
+    for (int i = 1; i >= 0; --i) {
         uint8_t lsb = bytes[k++];
         uint8_t msb = bytes[k++];
-        mic_delay[i] = (uint16_t)((msb << 8) | lsb);
+        mic_pos[i] = (int16_t)((msb << 8) | lsb);
     }
 
-    for (int i = 0; i < 4; ++i) {
-        std::cout << i+1 << ": " << static_cast<int>(mic_delay[i]) << " | ";
+    for (int i = 0; i < 2; ++i) {
+        std::cout << i+1 << ": " << static_cast<int>(mic_pos[i]) << " | ";
     }
     std::cout << std::endl;
 
     return true;
 }
 
-// t1 = Mic 1 (Bottom-Right)
-// t2 = Mic 2 (Bottom-Left)
-// t3 = Mic 3 (Top-Left)
-// t4 = Mic 4 (Top-Right)
-static SoundLocation calculate_sound_origin(uint16_t t1, uint16_t t2,
-                                            uint16_t t3, uint16_t t4)
+// t1 = Mic pos x_cord in Q1.15 format
+// y_q15 = Mic pos y_cord in Q1.15 format
+static SoundLocation conv_coord_to_double(int16_t x_q15, int16_t y_q15)
 {
     SoundLocation loc;
+    const double SCALE_FACTOR = 32768.0;
 
-    double sec_per_cycle = 1.0 / CLOCK_FREQ_HZ;
-    double t_BR = t1 * sec_per_cycle;
-    double t_BL = t2 * sec_per_cycle;
-    double t_TL = t3 * sec_per_cycle;
-    double t_TR = t4 * sec_per_cycle;
-
-    double t_left   = (t_TL + t_BL) / 2.0;
-    double t_right  = (t_TR + t_BR) / 2.0;
-    double t_top    = (t_TL + t_TR) / 2.0;
-    double t_bottom = (t_BL + t_BR) / 2.0;
-
-    double delta_t_x = t_left - t_right;
-    double delta_t_y = t_bottom - t_top;
-
-    double distance_x = delta_t_x * SPEED_OF_SOUND_M_S;
-    double distance_y = delta_t_y * SPEED_OF_SOUND_M_S;
-
-    loc.x_proj = distance_x / ARRAY_SPACING_M;
-    loc.y_proj = distance_y / ARRAY_SPACING_M;
-
-    if (loc.x_proj > 1.0)  loc.x_proj = 1.0;
-    if (loc.x_proj < -1.0) loc.x_proj = -1.0;
-    if (loc.y_proj > 1.0)  loc.y_proj = 1.0;
-    if (loc.y_proj < -1.0) loc.y_proj = -1.0;
-
-    loc.x_proj = -loc.x_proj; // Flip X so positive is right and negative is left.
-
+    loc.x_proj = static_cast<double>(x_q15) / SCALE_FACTOR;
+    loc.y_proj = static_cast<double>(y_q15) / SCALE_FACTOR;
+    
     return loc;
 }
 
 static cv::Point sound_to_frame_pixel(const SoundLocation &loc, int frame_width, int frame_height)
 {
     int x = (int)(((loc.x_proj + 1.0) * 0.5) * (frame_width  - 1));
-    int y = (int)(((-loc.y_proj + 1.0) * 0.5) * (frame_height - 1));
+    int y = (int)(((loc.y_proj + 1.0) * 0.5) * (frame_height - 1));
 
     x = std::max(0, std::min(frame_width  - 1, x));
     y = std::max(0, std::min(frame_height - 1, y));
@@ -286,7 +233,7 @@ int main()
     cap.set(CV_CAP_PROP_FRAME_WIDTH, 800);
     cap.set(CV_CAP_PROP_FRAME_HEIGHT, 600);
 
- //   cv::namedWindow("Camera Overlay", CV_WINDOW_NORMAL);
+    cv::namedWindow("Camera Overlay", CV_WINDOW_NORMAL);
     // cv::setWindowProperty("Camera Overlay", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
 
     cv::Mat frame;
@@ -310,15 +257,15 @@ int main()
         // Fade old heatmap slightly every frame.
         heatmap.convertTo(heatmap, -1, 0.92, 0.0);
 
-        uint16_t mic_delay[4] = {0, 0, 0, 0};
-        bool got_delays = false;
+        int16_t mic_pos[2] = {0, 0};
+        bool got_pos = false;
 
         if (hw_ok) {
-            got_delays = read_mic_delays(hw, mic_delay);
+            got_pos = read_mic_pos(hw, mic_pos);
         }
 
-        if (got_delays) {
-            SoundLocation loc = calculate_sound_origin(mic_delay[0], mic_delay[1], mic_delay[2], mic_delay[3]);
+        if (got_pos) {
+            SoundLocation loc = conv_coord_to_double(mic_pos[0], mic_pos[1]);
             last_center = sound_to_frame_pixel(loc, frame.cols, frame.rows);
 
             // Stronger blob when there is more directional separation.
