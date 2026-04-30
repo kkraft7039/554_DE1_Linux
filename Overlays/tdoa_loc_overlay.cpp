@@ -491,7 +491,33 @@ int main()
 
     // Keep the last valid location so the blob persists even if a read is missed.
     cv::Point last_center(400, 300);
+    // --- 1. Camera Matrix (Intrinsics) ---
+    cv::Mat mtx = (cv::Mat_<double>(3,3) << 
+        2601.75413, 0.0,        1148.21068,
+        0.0,        2621.83026, 826.245702,
+        0.0,        0.0,        1.0
+    );
 
+    // --- 2. Distortion Coefficients ---
+    // Order: k1, k2, p1, p2, k3
+    cv::Mat dist = (cv::Mat_<double>(1,5) << 
+        -2.30531567, 5.38301018, 0.01110815, -0.00214037442, -4.93779935
+    );
+
+    // --- 3. Extrinsic Rotation Vector (rvec) ---
+    cv::Mat rvec = (cv::Mat_<double>(3,1) << 
+        -0.27916474, 
+        0.42220318, 
+        0.0450641
+    );
+
+    // --- 4. Extrinsic Translation Vector (tvec) ---
+    cv::Mat tvec = (cv::Mat_<double>(3,1) << 
+        0.03045097, 
+        -0.34706542, 
+        1.35788056
+    );
+    
     while (true) {
         if (!cap.read(frame) || frame.empty()) {
             std::cerr << "Error: failed to read frame\n";
@@ -526,8 +552,13 @@ int main()
             }
             
             //last_center = sound_to_frame_pixel(loc, frame.cols, frame.rows);
-            last_center = loc3d_to_frame_pixel(loc3d, frame.cols, frame.rows);
+            // last_center = loc3d_to_frame_pixel(loc3d, frame.cols, frame.rows);
+            
+            std::vector<cv::Point3f> objectPoints = { cv::Point3f(loc3d.X, loc3d.Y, loc3d.Z) };
 
+            // The Projection
+            cv::projectPoints(objectPoints, rvec, tvec, mtx, dist, imagePoints);
+            last_center = cv::Point(imagePoints[0].x, imagePoints[0].y);
 
             // Stronger blob when there is more directional separation.
             // double magnitude = std::sqrt(loc.x_proj * loc.x_proj + loc.y_proj * loc.y_proj);
