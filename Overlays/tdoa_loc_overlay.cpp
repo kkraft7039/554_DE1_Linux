@@ -1,10 +1,11 @@
-#include <opencv2/opencv.hpp>
+ #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <stdint.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <cmath>
+#include <vector>
 #include <algorithm>
 #include <cstdlib>
 #include <ctime>
@@ -20,6 +21,112 @@
 #define SPEED_OF_SOUND_M_S 343.0
 #define CLOCK_FREQ_HZ      50000000.0
 #define ARRAY_SPACING_M    0.2345
+
+// Mic array coordinates (Meters)
+// Assuming M0=Top-Left, M1=Top-Right, M2=Bottom-Right, M3=Bottom-Left
+const double MIC_X[4] = {0.11725,  -0.11725,  -0.11725, 0.11725};
+const double MIC_Y[4] = {-0.11725,  -0.11725, 0.11725, 0.11725};
+
+struct Point3D {
+    double X;
+    double Y;
+    double Z;
+    bool valid;
+};
+
+// Helper function to calculate the determinant of a 3x3 matrix
+double determinant3x3(double m[3][3]) {
+    return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
+           m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
+           m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+}
+
+Point3D calculate_tdoa_position(uint32_t hit_cycles[4]) {
+    Point3D result = {0.0, 0.0, 0.0, false};
+
+    // Step 1: Find the reference microphone (the one with 0 cycles)
+    int ref_idx = -1;
+    for (int i = 0; i < 4; i++) {
+        if (hit_cycles[i] == 0) {
+            ref_idx = i;
+            break;
+        }
+    }
+
+    if (ref_idx == -1) {
+        std::cerr << "Error: No reference mic found. One cycle count must be 0." << std::endl;
+        return result;
+    }
+
+    double x0 = MIC_X[ref_idx];
+    double y0 = MIC_Y[ref_idx];
+
+    // Step 2: Set up the Linear System (A * v = B)
+    double A[3][3];
+    double B[3];
+    
+    int row = 0;
+    for (int i = 0; i < 4; i++) {
+        if (i == ref_idx) continue; // Skip the reference mic
+
+        // Convert delay from clock cycles to meters
+        double delta_t = hit_cycles[i] / CLOCK_FREQ_HZ;
+        double delta_d = delta_t * SPEED_OF_SOUND;
+
+        double xi = MIC_X[i];
+        double yi = MIC_Y[i];
+
+        // Populate Matrix A
+        A[row][0] = 2.0 * (xi - x0);
+        A[row][1] = 2.0 * (yi - y0);
+        A[row][2] = 2.0 * delta_d;
+
+        // Populate Vector B
+        B[row] = (xi * xi) - (x0 * x0) + 
+                 (yi * yi) - (y0 * y0) - 
+                 (delta_d * delta_d);
+        row++;
+    }
+
+    // Step 3: Solve the 3x3 system using Cramer's Rule
+    double det_A = determinant3x3(A);
+
+    if (std::abs(det_A) < 1e-9) {
+        std::cerr << "Error: Matrix is singular. Cannot resolve location." << std::endl;
+        return result;
+    }
+
+    double A_X[3][3], A_Y[3][3], A_D[3][3];
+    for (int r = 0; r < 3; r++) {
+        for (int c = 0; c < 3; c++) {
+            A_X[r][c] = (c == 0) ? B[r] : A[r][c];
+            A_Y[r][c] = (c == 1) ? B[r] : A[r][c];
+            A_D[r][c] = (c == 2) ? B[r] : A[r][c];
+        }
+    }
+
+    // Solve for X, Y, and the 3D distance to reference mic (D0)
+    result.X = determinant3x3(A_X) / det_A;
+    result.Y = determinant3x3(A_Y) / det_A;
+    double D0 = determinant3x3(A_D) / det_A;
+
+    // Step 4: Calculate Z (Depth)
+    // Pythagoras: D0^2 = (X - x0)^2 + (Y - y0)^2 + Z^2
+    double z_squared = (D0 * D0) - 
+                       std::pow(result.X - x0, 2) - 
+                       std::pow(result.Y - y0, 2);
+
+    // Guard against floating point inaccuracies or impossible physical timings 
+    // producing a negative square root (noise)
+    if (z_squared < 0) {
+        result.Z = 0.0;
+    } else {
+        result.Z = std::sqrt(z_squared);
+    }
+
+    result.valid = true;
+    return result;
+}
 
 struct SoundLocation {
     double x_proj; // -1.0 (left)   to 1.0 (right)
@@ -318,7 +425,8 @@ int main()
         }
 
         if (got_delays) {
-            SoundLocation loc = calculate_sound_origin(mic_delay[0], mic_delay[1], mic_delay[2], mic_delay[3]);
+            // SoundLocation loc = calculate_sound_origin(mic_delay[0], mic_delay[1], mic_delay[2], mic_delay[3]);
+
             last_center = sound_to_frame_pixel(loc, frame.cols, frame.rows);
 
             // Stronger blob when there is more directional separation.
