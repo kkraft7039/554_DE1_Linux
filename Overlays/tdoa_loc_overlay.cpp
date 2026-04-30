@@ -41,10 +41,10 @@ double determinant3x3(double m[3][3]) {
            m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
 }
 
-Point3D calculate_tdoa_position(uint16_t hit_cycles[4]) {
-    Point3D result = {0.0, 0.0, 0.0, false};
-
-    // Step 1: Find the reference microphone (the one with 0 cycles)
+Point3D calculate_bounded_tdoa(uint32_t hit_cycles[4]) {
+    Point3D best_point = {0.0, 0.0, 0.0, false};
+    
+    // 1. Find the reference mic (0 cycles)
     int ref_idx = -1;
     for (int i = 0; i < 4; i++) {
         if (hit_cycles[i] == 0) {
@@ -52,82 +52,159 @@ Point3D calculate_tdoa_position(uint16_t hit_cycles[4]) {
             break;
         }
     }
+    if (ref_idx == -1) return best_point;
 
-    if (ref_idx == -1) {
-        std::cerr << "Error: No reference mic found. One cycle count must be 0." << std::endl;
-        return result;
-    }
-
-    double x0 = MIC_X[ref_idx];
-    double y0 = MIC_Y[ref_idx];
-
-    // Step 2: Set up the Linear System (A * v = B)
-    double A[3][3];
-    double B[3];
-    
-    int row = 0;
+    // 2. Convert clock cycles to measured distance differences
+    double measured_dd[4] = {0};
     for (int i = 0; i < 4; i++) {
-        if (i == ref_idx) continue; // Skip the reference mic
-
-        // Convert delay from clock cycles to meters
-        double delta_t = hit_cycles[i] / CLOCK_FREQ_HZ;
-        double delta_d = delta_t * SPEED_OF_SOUND_M_S;
-
-        double xi = MIC_X[i];
-        double yi = MIC_Y[i];
-
-        // Populate Matrix A
-        A[row][0] = 2.0 * (xi - x0);
-        A[row][1] = 2.0 * (yi - y0);
-        A[row][2] = 2.0 * delta_d;
-
-        // Populate Vector B
-        B[row] = (xi * xi) - (x0 * x0) + 
-                 (yi * yi) - (y0 * y0) - 
-                 (delta_d * delta_d);
-        row++;
+        measured_dd[i] = (hit_cycles[i] / CLOCK_FREQ_HZ) * SPEED_OF_SOUND_M_S;
     }
 
-    // Step 3: Solve the 3x3 system using Cramer's Rule
-    double det_A = determinant3x3(A);
+    // 3. Define the Search Space (2-meter cube in front of the camera)
+    // Camera is at (0,0,0) looking down positive Z.
+    double x_min = -1.0, x_max = 1.0;
+    double y_min = -1.0, y_max = 1.0;
+    double z_min =  0.1, z_max = 2.0; // Don't search inside the physical mics (Z=0)
+    double step_size = 0.05; // 5 cm resolution
 
-    if (std::abs(det_A) < 1e-9) {
-        std::cerr << "Error: Matrix is singular. Cannot resolve location." << std::endl;
-        return result;
-    }
+    double min_error = DBL_MAX;
 
-    double A_X[3][3], A_Y[3][3], A_D[3][3];
-    for (int r = 0; r < 3; r++) {
-        for (int c = 0; c < 3; c++) {
-            A_X[r][c] = (c == 0) ? B[r] : A[r][c];
-            A_Y[r][c] = (c == 1) ? B[r] : A[r][c];
-            A_D[r][c] = (c == 2) ? B[r] : A[r][c];
+    // 4. Grid Search
+    for (double x = x_min; x <= x_max; x += step_size) {
+        for (double y = y_min; y <= y_max; y += step_size) {
+            for (double z = z_min; z <= z_max; z += step_size) {
+                
+                double current_error = 0.0;
+                
+                // Distance from this hypothetical point to the reference mic
+                double expected_d_ref = std::sqrt(std::pow(x - MIC_X[ref_idx], 2) + 
+                                                  std::pow(y - MIC_Y[ref_idx], 2) + 
+                                                  std::pow(z, 2));
+
+                // Check how well this point matches the other 3 mics
+                for (int i = 0; i < 4; i++) {
+                    if (i == ref_idx) continue;
+
+                    // Distance from point to this mic
+                    double expected_d_mic = std::sqrt(std::pow(x - MIC_X[i], 2) + 
+                                                      std::pow(y - MIC_Y[i], 2) + 
+                                                      std::pow(z, 2));
+
+                    // What should the delay have been if the sound was exactly here?
+                    double expected_dd = expected_d_mic - expected_d_ref;
+
+                    // Add squared error between what we expect and what the FPGA measured
+                    current_error += std::pow(expected_dd - measured_dd[i], 2);
+                }
+
+                // If this is the lowest error we've seen, save the point
+                if (current_error < min_error) {
+                    min_error = current_error;
+                    best_point.X = x;
+                    best_point.Y = y;
+                    best_point.Z = z;
+                    best_point.valid = true;
+                }
+            }
         }
     }
 
-    // Solve for X, Y, and the 3D distance to reference mic (D0)
-    result.X = determinant3x3(A_X) / det_A;
-    result.Y = determinant3x3(A_Y) / det_A;
-    double D0 = determinant3x3(A_D) / det_A;
-
-    // Step 4: Calculate Z (Depth)
-    // Pythagoras: D0^2 = (X - x0)^2 + (Y - y0)^2 + Z^2
-    double z_squared = (D0 * D0) - 
-                       std::pow(result.X - x0, 2) - 
-                       std::pow(result.Y - y0, 2);
-
-    // Guard against floating point inaccuracies or impossible physical timings 
-    // producing a negative square root (noise)
-    std::cout << "Z^2: " << z_squared << std::endl;
-    if (z_squared < 0) {
-        result.Z = 0.0;
-    } else {
-        result.Z = std::sqrt(z_squared);
+    // Optional: Reject the point entirely if even the "best" point has massive error
+    // (Meaning the sound was likely a random echo or physical bump to the desk)
+    if (min_error > 0.1) { // 10cm squared error threshold
+        best_point.valid = false;
     }
 
-    result.valid = true;
-    return result;
+    return best_point;
 }
+
+// Point3D calculate_tdoa_position(uint16_t hit_cycles[4]) {
+//     Point3D result = {0.0, 0.0, 0.0, false};
+
+//     // Step 1: Find the reference microphone (the one with 0 cycles)
+//     int ref_idx = -1;
+//     for (int i = 0; i < 4; i++) {
+//         if (hit_cycles[i] == 0) {
+//             ref_idx = i;
+//             break;
+//         }
+//     }
+
+//     if (ref_idx == -1) {
+//         std::cerr << "Error: No reference mic found. One cycle count must be 0." << std::endl;
+//         return result;
+//     }
+
+//     double x0 = MIC_X[ref_idx];
+//     double y0 = MIC_Y[ref_idx];
+
+//     // Step 2: Set up the Linear System (A * v = B)
+//     double A[3][3];
+//     double B[3];
+    
+//     int row = 0;
+//     for (int i = 0; i < 4; i++) {
+//         if (i == ref_idx) continue; // Skip the reference mic
+
+//         // Convert delay from clock cycles to meters
+//         double delta_t = hit_cycles[i] / CLOCK_FREQ_HZ;
+//         double delta_d = delta_t * SPEED_OF_SOUND_M_S;
+
+//         double xi = MIC_X[i];
+//         double yi = MIC_Y[i];
+
+//         // Populate Matrix A
+//         A[row][0] = 2.0 * (xi - x0);
+//         A[row][1] = 2.0 * (yi - y0);
+//         A[row][2] = 2.0 * delta_d;
+
+//         // Populate Vector B
+//         B[row] = (xi * xi) - (x0 * x0) + 
+//                  (yi * yi) - (y0 * y0) - 
+//                  (delta_d * delta_d);
+//         row++;
+//     }
+
+//     // Step 3: Solve the 3x3 system using Cramer's Rule
+//     double det_A = determinant3x3(A);
+
+//     if (std::abs(det_A) < 1e-9) {
+//         std::cerr << "Error: Matrix is singular. Cannot resolve location." << std::endl;
+//         return result;
+//     }
+
+//     double A_X[3][3], A_Y[3][3], A_D[3][3];
+//     for (int r = 0; r < 3; r++) {
+//         for (int c = 0; c < 3; c++) {
+//             A_X[r][c] = (c == 0) ? B[r] : A[r][c];
+//             A_Y[r][c] = (c == 1) ? B[r] : A[r][c];
+//             A_D[r][c] = (c == 2) ? B[r] : A[r][c];
+//         }
+//     }
+
+//     // Solve for X, Y, and the 3D distance to reference mic (D0)
+//     result.X = determinant3x3(A_X) / det_A;
+//     result.Y = determinant3x3(A_Y) / det_A;
+//     double D0 = determinant3x3(A_D) / det_A;
+
+//     // Step 4: Calculate Z (Depth)
+//     // Pythagoras: D0^2 = (X - x0)^2 + (Y - y0)^2 + Z^2
+//     double z_squared = (D0 * D0) - 
+//                        std::pow(result.X - x0, 2) - 
+//                        std::pow(result.Y - y0, 2);
+
+//     // Guard against floating point inaccuracies or impossible physical timings 
+//     // producing a negative square root (noise)
+//     std::cout << "Z^2: " << z_squared << std::endl;
+//     if (z_squared < 0) {
+//         result.Z = 0.0;
+//     } else {
+//         result.Z = std::sqrt(z_squared);
+//     }
+
+//     result.valid = true;
+//     return result;
+// }
 
 struct SoundLocation {
     double x_proj; // -1.0 (left)   to 1.0 (right)
@@ -438,7 +515,8 @@ int main()
 
         if (got_delays) {
             // SoundLocation loc = calculate_sound_origin(mic_delay[0], mic_delay[1], mic_delay[2], mic_delay[3]);
-            Point3D loc3d = calculate_tdoa_position(mic_delay);
+            // Point3D loc3d = calculate_tdoa_position(mic_delay);
+            Point3D loc3d = calculate_bounded_tdoa(mic_delay);
 
             if (loc3d.valid) {
                 std::cout << "Sound Source Localized!" << std::endl;
