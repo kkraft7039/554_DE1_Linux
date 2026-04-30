@@ -41,7 +41,7 @@ double determinant3x3(double m[3][3]) {
            m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
 }
 
-Point3D calculate_bounded_tdoa(uint32_t hit_cycles[4]) {
+Point3D calculate_bounded_tdoa(uint16_t hit_cycles[4]) {
     Point3D best_point = {0.0, 0.0, 0.0, false};
     
     // 1. Find the reference mic (0 cycles)
