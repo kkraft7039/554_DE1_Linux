@@ -561,6 +561,9 @@ int main()
             
             // The Projection
             cv::projectPoints(objectPoints, rvec, tvec, mtx, dist, imagePoints);
+
+            std::cout << "Projected 2D Point: (" << imagePoints[0].x << ", " << imagePoints[0].y << ")\n";
+            
             last_center = cv::Point(imagePoints[0].x, imagePoints[0].y);
 
             // Stronger blob when there is more directional separation.
