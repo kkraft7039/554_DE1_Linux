@@ -552,7 +552,7 @@ static void draw_heatmap_blob(cv::Mat &heatmap, const cv::Point &center, double 
             cv::Vec3b &pix = heatmap.at<cv::Vec3b>(y, x);
 
             int blue_add  = (int)(20.0  * falloff * strength);
-            int green_add = (int)(120.0 * falloff * strength);
+            int green_add = (int)(40.0 * falloff * strength);
             int red_add   = (int)(255.0 * falloff * strength);
 
             pix[0] = (uchar)std::min(255, (int)pix[0] + blue_add);
@@ -689,7 +689,7 @@ int main()
             // double magnitude = std::sqrt(loc.x_proj * loc.x_proj + loc.y_proj * loc.y_proj);
             // double magnitude = std::sqrt(loc3d.X * loc3d.X + loc3d.Y * loc3d.Y + loc3d.Z * loc3d.Z); 
             // double strength = std::max(0.35, std::min(1.0, 0.45 + 0.55 * magnitude));
-            draw_heatmap_blob(heatmap, last_center, 0.8);
+            draw_heatmap_blob(heatmap, last_center, 1.0);
             end_time = clock();
 
             std::cout << "Heatmap draw time: " << (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0 << " ms" << std::endl;
