@@ -41,7 +41,7 @@ double determinant3x3(double m[3][3]) {
            m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
 }
 
-Point3D calculate_tdoa_position(uint32_t hit_cycles[4]) {
+Point3D calculate_tdoa_position(uint16_t hit_cycles[4]) {
     Point3D result = {0.0, 0.0, 0.0, false};
 
     // Step 1: Find the reference microphone (the one with 0 cycles)
@@ -71,7 +71,7 @@ Point3D calculate_tdoa_position(uint32_t hit_cycles[4]) {
 
         // Convert delay from clock cycles to meters
         double delta_t = hit_cycles[i] / CLOCK_FREQ_HZ;
-        double delta_d = delta_t * SPEED_OF_SOUND;
+        double delta_d = delta_t * SPEED_OF_SOUND_M_S;
 
         double xi = MIC_X[i];
         double yi = MIC_Y[i];
@@ -439,11 +439,11 @@ int main()
             // SoundLocation loc = calculate_sound_origin(mic_delay[0], mic_delay[1], mic_delay[2], mic_delay[3]);
             Point3D loc3d = calculate_tdoa_position(mic_delay);
 
-            if (location.valid) {
+            if (loc3d.valid) {
                 std::cout << "Sound Source Localized!" << std::endl;
-                std::cout << "X: " << location.X << " meters" << std::endl;
-                std::cout << "Y: " << location.Y << " meters" << std::endl;
-                std::cout << "Z: " << location.Z << " meters" << std::endl;
+                std::cout << "X: " << loc3d.X << " meters" << std::endl;
+                std::cout << "Y: " << loc3d.Y << " meters" << std::endl;
+                std::cout << "Z: " << loc3d.Z << " meters" << std::endl;
             }
             
             //last_center = sound_to_frame_pixel(loc, frame.cols, frame.rows);
