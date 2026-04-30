@@ -38,7 +38,7 @@ struct HwInterface {
 };
 
 // Same byte reader as fast_pcm_file_write.c
-static bool get_next_byte(HwInterface &hw,
+static bool get_next_byte_unblocking(HwInterface &hw,
                           uint8_t &byte_out)
 {
     static bool waiting = false;
@@ -66,6 +66,33 @@ static bool get_next_byte(HwInterface &hw,
 
     // Ready for next byte
     waiting = false;
+    return true;
+}
+
+// Same byte reader as fast_pcm_file_write.c
+static bool get_next_byte_blocking(HwInterface &hw,
+                          uint8_t &byte_out)
+{
+    uint32_t dipsw_val = *hw.dipsw_pio;
+
+    // Phase 1: request byte
+    hw.current_req_clk ^= 0x01;
+    *hw.led_pio = hw.current_req_clk;
+
+    // Phase 2: wait for PL ack to match request bit
+    do { 
+        dipsw_val = *hw.dipsw_pio;
+    } while (((dipsw_val >> 1) & 0x01) != (hw.current_req_clk & 0x01));
+
+    // Phase 3: wait for valid/data-ready bit
+    do {
+        dipsw_val = *hw.dipsw_pio; 
+    } while ((dipsw_val & 0x01) == 0);
+
+    usleep(1);
+    byte_out = (uint8_t)((dipsw_val >> 2) & 0xFF);
+
+    // Ready for next byte
     return true;
 }
 
@@ -117,20 +144,20 @@ static void close_hardware(HwInterface &hw)
 static bool read_mic_delays(HwInterface &hw, uint16_t mic_delay[4])
 {
     static uint8_t bytes[8];
-    static int byte_idx = 0;
 
     uint8_t byte;
-    if (!get_next_byte(hw, byte)) {
+    if (!get_next_byte_unblocking(hw, byte)) {
         return false;
     }
 
-    bytes[byte_idx++] = byte;
+    bytes[0] = byte;
 
-    if (byte_idx < 8) {
-        return false;
+    for (int i = 1; i < 8; ++i) {
+        if (!get_next_byte_blocking(hw, byte)) {
+            return false;
+        }
+        bytes[i] = byte;
     }
-
-    byte_idx = 0;
 
     // PL sends: mic3 LSB, mic3 MSB, mic2 LSB, mic2 MSB, ...
     int k = 0;
