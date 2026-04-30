@@ -34,17 +34,55 @@ struct Point3D {
     bool valid;
 };
 
-// Helper function to calculate the determinant of a 3x3 matrix
-double determinant3x3(double m[3][3]) {
-    return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
-           m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
-           m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+// 1. Define a structure to hold precomputed data for a single coordinate
+struct GridPoint {
+    double x;
+    double y;
+    double z;
+    double dist[4]; // Absolute distance to each of the 4 microphones
+};
+
+// 2. Global lookup table
+std::vector<GridPoint> tdoa_grid_lut;
+
+void init_tdoa_lut() {
+    double x_min = -1.0, x_max = 1.0;
+    double y_min = -1.0, y_max = 1.0;
+    double z_min =  0.1, z_max = 2.0;
+    double step_size = 0.05;
+
+    // Pre-allocate memory so the vector doesn't resize dynamically
+    tdoa_grid_lut.reserve(41 * 41 * 39); 
+
+    for (double x = x_min; x <= x_max + 0.001; x += step_size) {
+        for (double y = y_min; y <= y_max + 0.001; y += step_size) {
+            for (double z = z_min; z <= z_max + 0.001; z += step_size) {
+                
+                GridPoint pt;
+                pt.x = x;
+                pt.y = y;
+                pt.z = z;
+                
+                for (int i = 0; i < 4; i++) {
+                    // Do the heavy sqrt/pow math here offline
+                    pt.dist[i] = std::sqrt((x - MIC_X[i])*(x - MIC_X[i]) + 
+                                           (y - MIC_Y[i])*(y - MIC_Y[i]) + 
+                                           (z * z));
+                }
+                tdoa_grid_lut.push_back(pt);
+            }
+        }
+    }
+    std::cout << "LUT initialized with " << tdoa_grid_lut.size() << " points.\n";
 }
 
 Point3D calculate_bounded_tdoa(uint16_t hit_cycles[4]) {
-    Point3D best_point = {0.0, 0.0, 0.0, false};
+    Point3D best_point;
+    best_point.X = 0.0;
+    best_point.Y = 0.0;
+    best_point.Z = 0.0;
+    best_point.valid = false;
     
-    // 1. Find the reference mic (0 cycles)
     int ref_idx = -1;
     for (int i = 0; i < 4; i++) {
         if (hit_cycles[i] == 0) {
@@ -54,69 +92,133 @@ Point3D calculate_bounded_tdoa(uint16_t hit_cycles[4]) {
     }
     if (ref_idx == -1) return best_point;
 
-    // 2. Convert clock cycles to measured distance differences
-    double measured_dd[4] = {0};
+    double measured_dd[4] = {0, 0, 0, 0};
     for (int i = 0; i < 4; i++) {
         measured_dd[i] = (hit_cycles[i] / CLOCK_FREQ_HZ) * SPEED_OF_SOUND_M_S;
     }
 
-    // 3. Define the Search Space (2-meter cube in front of the camera)
-    // Camera is at (0,0,0) looking down positive Z.
-    double x_min = -1.0, x_max = 1.0;
-    double y_min = -1.0, y_max = 1.0;
-    double z_min =  0.1, z_max = 2.0; // Don't search inside the physical mics (Z=0)
-    double step_size = 0.05; // 5 cm resolution
-
     double min_error = DBL_MAX;
 
-    // 4. Grid Search
-    for (double x = x_min; x <= x_max; x += step_size) {
-        for (double y = y_min; y <= y_max; y += step_size) {
-            for (double z = z_min; z <= z_max; z += step_size) {
-                
-                double current_error = 0.0;
-                
-                // Distance from this hypothetical point to the reference mic
-                double expected_d_ref = std::sqrt(std::pow(x - MIC_X[ref_idx], 2) + 
-                                                  std::pow(y - MIC_Y[ref_idx], 2) + 
-                                                  std::pow(z, 2));
+    // Fast 1D loop using C++98 standard iterators
+    for (std::vector<GridPoint>::const_iterator it = tdoa_grid_lut.begin(); it != tdoa_grid_lut.end(); ++it) {
+        double current_error = 0.0;
+        
+        for (int i = 0; i < 4; i++) {
+            if (i == ref_idx) continue;
 
-                // Check how well this point matches the other 3 mics
-                for (int i = 0; i < 4; i++) {
-                    if (i == ref_idx) continue;
+            // Simple subtraction using our precomputed lookup via the iterator
+            double expected_dd = it->dist[i] - it->dist[ref_idx];
+            
+            // Expected minus measured
+            double diff = expected_dd - measured_dd[i];
+            
+            // Fast native multiplication instead of std::pow
+            current_error += (diff * diff); 
+            
+            // EARLY EXIT: If this point is already worse than our best point, 
+            // don't bother checking the remaining mics. Skip to the next point!
+            if (current_error >= min_error) break; 
+        }
 
-                    // Distance from point to this mic
-                    double expected_d_mic = std::sqrt(std::pow(x - MIC_X[i], 2) + 
-                                                      std::pow(y - MIC_Y[i], 2) + 
-                                                      std::pow(z, 2));
-
-                    // What should the delay have been if the sound was exactly here?
-                    double expected_dd = expected_d_mic - expected_d_ref;
-
-                    // Add squared error between what we expect and what the FPGA measured
-                    current_error += std::pow(expected_dd - measured_dd[i], 2);
-                }
-
-                // If this is the lowest error we've seen, save the point
-                if (current_error < min_error) {
-                    min_error = current_error;
-                    best_point.X = x;
-                    best_point.Y = y;
-                    best_point.Z = z;
-                    best_point.valid = true;
-                }
-            }
+        if (current_error < min_error) {
+            min_error = current_error;
+            best_point.X = it->x;
+            best_point.Y = it->y;
+            best_point.Z = it->z;
+            best_point.valid = true;
         }
     }
 
-    // Optional: Reject the point entirely if even the "best" point has massive error
-    // (Meaning the sound was likely a random echo or physical bump to the desk)
-    if (min_error > 0.1) { // 10cm squared error threshold
+    if (min_error > 0.1) { 
         best_point.valid = false;
     }
 
     return best_point;
 }
+
+// Helper function to calculate the determinant of a 3x3 matrix
+// double determinant3x3(double m[3][3]) {
+//     return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
+//            m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
+//            m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+// }
+
+// Point3D calculate_bounded_tdoa(uint16_t hit_cycles[4]) {
+//     Point3D best_point = {0.0, 0.0, 0.0, false};
+    
+//     // 1. Find the reference mic (0 cycles)
+//     int ref_idx = -1;
+//     for (int i = 0; i < 4; i++) {
+//         if (hit_cycles[i] == 0) {
+//             ref_idx = i;
+//             break;
+//         }
+//     }
+//     if (ref_idx == -1) return best_point;
+
+//     // 2. Convert clock cycles to measured distance differences
+//     double measured_dd[4] = {0};
+//     for (int i = 0; i < 4; i++) {
+//         measured_dd[i] = (hit_cycles[i] / CLOCK_FREQ_HZ) * SPEED_OF_SOUND_M_S;
+//     }
+
+//     // 3. Define the Search Space (2-meter cube in front of the camera)
+//     // Camera is at (0,0,0) looking down positive Z.
+//     double x_min = -1.0, x_max = 1.0;
+//     double y_min = -1.0, y_max = 1.0;
+//     double z_min =  0.1, z_max = 2.0; // Don't search inside the physical mics (Z=0)
+//     double step_size = 0.05; // 5 cm resolution
+
+//     double min_error = DBL_MAX;
+
+//     // 4. Grid Search
+//     for (double x = x_min; x <= x_max; x += step_size) {
+//         for (double y = y_min; y <= y_max; y += step_size) {
+//             for (double z = z_min; z <= z_max; z += step_size) {
+                
+//                 double current_error = 0.0;
+                
+//                 // Distance from this hypothetical point to the reference mic
+//                 double expected_d_ref = std::sqrt(std::pow(x - MIC_X[ref_idx], 2) + 
+//                                                   std::pow(y - MIC_Y[ref_idx], 2) + 
+//                                                   std::pow(z, 2));
+
+//                 // Check how well this point matches the other 3 mics
+//                 for (int i = 0; i < 4; i++) {
+//                     if (i == ref_idx) continue;
+
+//                     // Distance from point to this mic
+//                     double expected_d_mic = std::sqrt(std::pow(x - MIC_X[i], 2) + 
+//                                                       std::pow(y - MIC_Y[i], 2) + 
+//                                                       std::pow(z, 2));
+
+//                     // What should the delay have been if the sound was exactly here?
+//                     double expected_dd = expected_d_mic - expected_d_ref;
+
+//                     // Add squared error between what we expect and what the FPGA measured
+//                     current_error += std::pow(expected_dd - measured_dd[i], 2);
+//                 }
+
+//                 // If this is the lowest error we've seen, save the point
+//                 if (current_error < min_error) {
+//                     min_error = current_error;
+//                     best_point.X = x;
+//                     best_point.Y = y;
+//                     best_point.Z = z;
+//                     best_point.valid = true;
+//                 }
+//             }
+//         }
+//     }
+
+//     // Optional: Reject the point entirely if even the "best" point has massive error
+//     // (Meaning the sound was likely a random echo or physical bump to the desk)
+//     if (min_error > 0.1) { // 10cm squared error threshold
+//         best_point.valid = false;
+//     }
+
+//     return best_point;
+// }
 
 // Point3D calculate_tdoa_position(uint16_t hit_cycles[4]) {
 //     Point3D result = {0.0, 0.0, 0.0, false};
@@ -517,7 +619,9 @@ int main()
     for (int i = 0; i < 256; i++) {
         // Precalculate the 0.92 multiplier
         decayLUT.at<uchar>(i) = cv::saturate_cast<uchar>(i * 0.92); 
-}
+    }
+
+    init_tdoa_lut();
     
     while (true) {
         cap.grab();
@@ -583,9 +687,9 @@ int main()
             start_time = clock();
             // Stronger blob when there is more directional separation.
             // double magnitude = std::sqrt(loc.x_proj * loc.x_proj + loc.y_proj * loc.y_proj);
-            double magnitude = std::sqrt(loc3d.X * loc3d.X + loc3d.Y * loc3d.Y + loc3d.Z * loc3d.Z); 
-            double strength = std::max(0.35, std::min(1.0, 0.45 + 0.55 * magnitude));
-            draw_heatmap_blob(heatmap, last_center, strength);
+            // double magnitude = std::sqrt(loc3d.X * loc3d.X + loc3d.Y * loc3d.Y + loc3d.Z * loc3d.Z); 
+            // double strength = std::max(0.35, std::min(1.0, 0.45 + 0.55 * magnitude));
+            draw_heatmap_blob(heatmap, last_center, 0.8);
             end_time = clock();
 
             std::cout << "Heatmap draw time: " << (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0 << " ms" << std::endl;
