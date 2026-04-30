@@ -529,7 +529,7 @@ int main()
         heatmap.convertTo(heatmap, -1, 0.92, 0.0);
         end_time = time(NULL);
 
-        cout << "Heatmap decay time: " << difftime(end_time, start_time) << " seconds" << std::endl;
+        std::cout << "Heatmap decay time: " << difftime(end_time, start_time) << " seconds" << std::endl;
 
         uint16_t mic_delay[4] = {0, 0, 0, 0};
 
@@ -537,7 +537,7 @@ int main()
         bool got_delays = hw_ok && read_mic_delays(hw, mic_delay);
         end_time = time(NULL);
 
-        cout << "PL read time: " << difftime(end_time, start_time) << " seconds" << std::endl;
+        std::cout << "PL read time: " << difftime(end_time, start_time) << " seconds" << std::endl;
 
         if (got_delays) {
             // SoundLocation loc = calculate_sound_origin(mic_delay[0], mic_delay[1], mic_delay[2], mic_delay[3]);
@@ -546,7 +546,7 @@ int main()
             Point3D loc3d = calculate_bounded_tdoa(mic_delay);
             end_time = time(NULL);
 
-            cout << "3D Position Calculation Time: " << difftime(end_time, start_time) << " seconds" << std::endl;
+            std::cout << "3D Position Calculation Time: " << difftime(end_time, start_time) << " seconds" << std::endl;
 
             if (loc3d.valid) {
                 std::cout << "Sound Source Localized!" << std::endl;
@@ -565,7 +565,7 @@ int main()
             cv::projectPoints(objectPoints, rvec, tvec, mtx, dist, imagePoints);
             end_time = time(NULL);
 
-            cout << "Projection Time: " << difftime(end_time, start_time) << " seconds" << std::endl;
+            std::cout << "Projection Time: " << difftime(end_time, start_time) << " seconds" << std::endl;
 
             std::cout << "Projected 2D Point: (" << imagePoints[0].x << ", " << imagePoints[0].y << ")\n";
             
@@ -579,7 +579,7 @@ int main()
             draw_heatmap_blob(heatmap, last_center, strength);
             end_time = time(NULL);
 
-            cout << "Heatmap draw time: " << difftime(end_time, start_time) << " seconds" << std::endl;
+            std::cout << "Heatmap draw time: " << difftime(end_time, start_time) << " seconds" << std::endl;
         }
 
         start_time = time(NULL);
@@ -587,7 +587,7 @@ int main()
         cv::imshow("Camera Overlay", displayFrame);
         end_time = time(NULL);
 
-        cout << "Display time: " << difftime(end_time, start_time) << " seconds" << std::endl;
+        std::cout << "Display time: " << difftime(end_time, start_time) << " seconds" << std::endl;
 
         char key = (char)cv::waitKey(1);
         if (key == 27 || key == 'q') {
