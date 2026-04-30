@@ -118,6 +118,7 @@ Point3D calculate_tdoa_position(uint16_t hit_cycles[4]) {
 
     // Guard against floating point inaccuracies or impossible physical timings 
     // producing a negative square root (noise)
+    std::cout << "Z^2: " << z_squared << std::endl;
     if (z_squared < 0) {
         result.Z = 0.0;
     } else {
