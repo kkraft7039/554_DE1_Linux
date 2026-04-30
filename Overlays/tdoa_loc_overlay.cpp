@@ -479,6 +479,7 @@ int main()
 
     cap.set(CV_CAP_PROP_FRAME_WIDTH, 800);
     cap.set(CV_CAP_PROP_FRAME_HEIGHT, 600);
+    cap.set(CV_CAP_PROP_BUFFER_SIZE, 1);
 
  //   cv::namedWindow("Camera Overlay", CV_WINDOW_NORMAL);
     // cv::setWindowProperty("Camera Overlay", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
@@ -511,7 +512,8 @@ int main()
     std::vector<cv::Point2f> imagePoints(1);
     
     while (true) {
-        if (!cap.read(frame) || frame.empty()) {
+        cap.grab();
+        if (!cap.retrieve(frame) || frame.empty()) {
             std::cerr << "Error: failed to read frame\n";
             break;
         }
