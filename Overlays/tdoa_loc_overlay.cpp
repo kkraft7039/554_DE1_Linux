@@ -1,4 +1,4 @@
- #include <opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
 #include <iostream>
 #include <stdint.h>
 #include <fcntl.h>
@@ -541,14 +541,14 @@ int main()
             if (loc3d.valid) {
                 std::cout << "Sound Source Localized!" << std::endl;
                 std::cout << "X: " << loc3d.X << " meters" << std::endl;
-                std::cout << "Y: " << loc3d.Y << " meters" << std::endl;
+                std::cout << "Y: " << -loc3d.Y << " meters" << std::endl;
                 std::cout << "Z: " << loc3d.Z << " meters" << std::endl;
             }
             
             //last_center = sound_to_frame_pixel(loc, frame.cols, frame.rows);
             // last_center = loc3d_to_frame_pixel(loc3d, frame.cols, frame.rows);
             
-            objectPoints[0] = cv::Point3f(loc3d.X, loc3d.Y, loc3d.Z);
+            objectPoints[0] = cv::Point3f(loc3d.X, -loc3d.Y, loc3d.Z);
             
             // The Projection
             cv::projectPoints(objectPoints, rvec, tvec, mtx, dist, imagePoints);
