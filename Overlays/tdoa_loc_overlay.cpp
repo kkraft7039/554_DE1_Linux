@@ -635,31 +635,19 @@ int main()
             last_center = cv::Point(frame.cols / 2, frame.rows / 2);
         }
 
-        start_time = clock();
         // Fade old heatmap slightly every frame.
         // heatmap.convertTo(heatmap, -1, 0.92, 0.0);
         // Instantly maps every pixel to its decayed value
         cv::LUT(heatmap, decayLUT, heatmap);
-        end_time = clock();
-
-        std::cout << "Heatmap decay time: " << (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0 << " ms" << std::endl;
 
         uint16_t mic_delay[4] = {0, 0, 0, 0};
 
-        start_time = clock();
         bool got_delays = hw_ok && read_mic_delays(hw, mic_delay);
-        end_time = clock();
-
-        std::cout << "PL read time: " << (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0 << " ms" << std::endl;
 
         if (got_delays) {
             // SoundLocation loc = calculate_sound_origin(mic_delay[0], mic_delay[1], mic_delay[2], mic_delay[3]);
             // Point3D loc3d = calculate_tdoa_position(mic_delay);
-            start_time = clock();
             Point3D loc3d = calculate_bounded_tdoa(mic_delay);
-            end_time = clock();
-
-            std::cout << "3D Position Calculation Time: " << (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0 << " ms" << std::endl;
 
             if (loc3d.valid) {
                 std::cout << "Sound Source Localized!" << std::endl;
@@ -678,29 +666,20 @@ int main()
             cv::projectPoints(objectPoints, rvec, tvec, mtx, dist, imagePoints);
             end_time = clock();
 
-            std::cout << "Projection Time: " << (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0 << " ms" << std::endl;
-
             std::cout << "Projected 2D Point: (" << imagePoints[0].x << ", " << imagePoints[0].y << ")\n";
             
             last_center = cv::Point(imagePoints[0].x, imagePoints[0].y);
 
-            start_time = clock();
             // Stronger blob when there is more directional separation.
             // double magnitude = std::sqrt(loc.x_proj * loc.x_proj + loc.y_proj * loc.y_proj);
             // double magnitude = std::sqrt(loc3d.X * loc3d.X + loc3d.Y * loc3d.Y + loc3d.Z * loc3d.Z); 
             // double strength = std::max(0.35, std::min(1.0, 0.45 + 0.55 * magnitude));
             draw_heatmap_blob(heatmap, last_center, 1.0);
-            end_time = clock();
 
-            std::cout << "Heatmap draw time: " << (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0 << " ms" << std::endl;
         }
 
-        start_time = clock();
         cv::addWeighted(frame, 1.0, heatmap, 0.55, 0.0, displayFrame);
         cv::imshow("Camera Overlay", displayFrame);
-        end_time = clock();
-
-        std::cout << "Display time: " << (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0 << " ms" << std::endl;
 
         char key = (char)cv::waitKey(1);
         if (key == 27 || key == 'q') {
