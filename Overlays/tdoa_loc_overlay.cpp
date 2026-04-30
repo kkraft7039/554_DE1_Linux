@@ -511,6 +511,13 @@ int main()
     std::vector<cv::Point2f> imagePoints(1);
 
     clock_t start_time, end_time;
+
+    // Create a 1D matrix with 256 elements
+    cv::Mat decayLUT(1, 256, CV_8U);
+    for (int i = 0; i < 256; i++) {
+        // Precalculate the 0.92 multiplier
+        decayLUT.at<uchar>(i) = cv::saturate_cast<uchar>(i * 0.92); 
+}
     
     while (true) {
         cap.grab();
@@ -526,7 +533,9 @@ int main()
 
         start_time = clock();
         // Fade old heatmap slightly every frame.
-        heatmap.convertTo(heatmap, -1, 0.92, 0.0);
+        // heatmap.convertTo(heatmap, -1, 0.92, 0.0);
+        // Instantly maps every pixel to its decayed value
+        cv::LUT(heatmap, decayLUT, heatmap);
         end_time = clock();
 
         std::cout << "Heatmap decay time: " << (double)(end_time - start_time) / CLOCKS_PER_SEC * 1000.0 << " ms" << std::endl;
