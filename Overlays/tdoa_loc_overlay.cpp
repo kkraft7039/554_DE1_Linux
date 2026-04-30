@@ -491,32 +491,23 @@ int main()
 
     // Keep the last valid location so the blob persists even if a read is missed.
     cv::Point last_center(400, 300);
-    // --- 1. Camera Matrix (Intrinsics) ---
+    // 1. Updated Intrinsics (Correct Resolution)
     cv::Mat mtx = (cv::Mat_<double>(3,3) << 
-        2601.75413, 0.0,        1148.21068,
-        0.0,        2621.83026, 826.245702,
-        0.0,        0.0,        1.0
+        555.48738527,   0.0,            437.60226682,
+        0.0,            556.2852091,    343.09571369,
+        0.0,            0.0,            1.0
     );
-
-    // --- 2. Distortion Coefficients ---
-    // Order: k1, k2, p1, p2, k3
+    
     cv::Mat dist = (cv::Mat_<double>(1,5) << 
-        -2.30531567, 5.38301018, 0.01110815, -0.00214037442, -4.93779935
+        -0.35276978, 0.1837128, 0.00041309, 0.00080041, -0.0580492
     );
 
-    // --- 3. Extrinsic Rotation Vector (rvec) ---
-    cv::Mat rvec = (cv::Mat_<double>(3,1) << 
-        -0.27916474, 
-        0.42220318, 
-        0.0450641
-    );
-
-    // --- 4. Extrinsic Translation Vector (tvec) ---
-    cv::Mat tvec = (cv::Mat_<double>(3,1) << 
-        0.03045097, 
-        -0.34706542, 
-        1.35788056
-    );
+    // 2. Extrinsics (Hardware setup: Camera and Mic on the same plane)
+    // Rotate 180 degrees (PI) on X to align Audio 'Up' (+Y) with Camera 'Down' (+Y)
+    cv::Mat rvec = (cv::Mat_<double>(3,1) << 3.1415926535, 0.0, 0.0); 
+    
+    // Translation: X=0 (centered), Y=Offset (meters), Z=0 (same plane)
+    cv::Mat tvec = (cv::Mat_<double>(3,1) << 0.0, camera_y_offset_meters, 0.0);
 
     std::vector<cv::Point3f> objectPoints(1);
     std::vector<cv::Point2f> imagePoints(1);
