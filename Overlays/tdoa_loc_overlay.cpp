@@ -332,6 +332,17 @@ static cv::Point sound_to_frame_pixel(const SoundLocation &loc, int frame_width,
     return cv::Point(x, y);
 }
 
+static cv::Point loc3d_to_frame_pixel(const Point3D &loc, int frame_width, int frame_height)
+{
+    int x = (int)(((loc.X + 1.0) * 0.5) * (frame_width  - 1));
+    int y = (int)(((-loc.Y + 1.0) * 0.5) * (frame_height - 1));
+
+    x = std::max(0, std::min(frame_width  - 1, x));
+    y = std::max(0, std::min(frame_height - 1, y));
+
+    return cv::Point(x, y);
+}
+
 // Circular heatmap with slight random variation each time it is drawn.
 // 'strength' controls brightness, and the overlay decays between frames.
 static void draw_heatmap_blob(cv::Mat &heatmap, const cv::Point &center, double strength)
@@ -426,11 +437,22 @@ int main()
 
         if (got_delays) {
             // SoundLocation loc = calculate_sound_origin(mic_delay[0], mic_delay[1], mic_delay[2], mic_delay[3]);
+            Point3D loc3d = calculate_tdoa_position(mic_delay);
 
-            last_center = sound_to_frame_pixel(loc, frame.cols, frame.rows);
+            if (location.valid) {
+                std::cout << "Sound Source Localized!" << std::endl;
+                std::cout << "X: " << location.X << " meters" << std::endl;
+                std::cout << "Y: " << location.Y << " meters" << std::endl;
+                std::cout << "Z: " << location.Z << " meters" << std::endl;
+            }
+            
+            //last_center = sound_to_frame_pixel(loc, frame.cols, frame.rows);
+            last_center = loc3d_to_frame_pixel(loc3d, frame.cols, frame.rows);
+
 
             // Stronger blob when there is more directional separation.
-            double magnitude = std::sqrt(loc.x_proj * loc.x_proj + loc.y_proj * loc.y_proj);
+            // double magnitude = std::sqrt(loc.x_proj * loc.x_proj + loc.y_proj * loc.y_proj);
+            double magnitude = std::sqrt(loc3d.X * loc3d.X + loc3d.Y * loc3d.Y + loc3d.Z * loc3d.Z); 
             double strength = std::max(0.35, std::min(1.0, 0.45 + 0.55 * magnitude));
             draw_heatmap_blob(heatmap, last_center, strength);
         } else {
