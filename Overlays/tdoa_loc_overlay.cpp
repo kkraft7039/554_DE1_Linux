@@ -551,9 +551,9 @@ static void draw_heatmap_blob(cv::Mat &heatmap, const cv::Point &center, double 
 
             cv::Vec3b &pix = heatmap.at<cv::Vec3b>(y, x);
 
-            int blue_add  = (int)(0.0  * falloff * strength);
+            int blue_add  = (int)(255.0  * falloff * strength);
             int green_add = (int)(255.0 * falloff * strength);
-            int red_add   = (int)(0.0 * falloff * strength);
+            int red_add   = (int)(20.0 * falloff * strength);
 
             pix[0] = (uchar)std::min(255, (int)pix[0] + blue_add);
             pix[1] = (uchar)std::min(255, (int)pix[1] + green_add);
