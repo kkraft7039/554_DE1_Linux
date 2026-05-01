@@ -591,15 +591,15 @@ int main()
 
     // Keep the last valid location so the blob persists even if a read is missed.
     cv::Point last_center(400, 300);
-    // 1. Updated Intrinsics (Correct Resolution)
+
     cv::Mat mtx = (cv::Mat_<double>(3,3) << 
-        555.48738527,   0.0,            437.60226682,
-        0.0,            556.2852091,    343.09571369,
+        552.86553486,   0,         439.62738644,
+        0.0,            553.67450396,    341.90564193,
         0.0,            0.0,            1.0
     );
     
     cv::Mat dist = (cv::Mat_<double>(1,5) << 
-        -0.35276978, 0.1837128, 0.00041309, 0.00080041, -0.0580492
+        -0.334692391,  0.141154759,  0.000694034003, -0.000480400143, -0.0309805779
     );
 
     // 2. Extrinsics (Hardware setup: Camera and Mic on the same plane)
