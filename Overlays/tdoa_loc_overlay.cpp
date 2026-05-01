@@ -678,48 +678,48 @@ int main()
 
         }
 
-        // cv::addWeighted(frame, 1.0, heatmap, 0.55, 0.0, displayFrame);
+        cv::addWeighted(frame, 1.0, heatmap, 0.55, 0.0, displayFrame);
         // 1. Ensure both matrices are continuous in memory for fast 1D traversal
-        if (frame.isContinuous() && heatmap.isContinuous()) {
+        // if (frame.isContinuous() && heatmap.isContinuous()) {
             
-            // Get raw pointers to the start of the data
-            unsigned char* f_ptr = frame.ptr<unsigned char>(0);
-            const unsigned char* h_ptr = heatmap.ptr<unsigned char>(0);
+        //     // Get raw pointers to the start of the data
+        //     unsigned char* f_ptr = frame.ptr<unsigned char>(0);
+        //     const unsigned char* h_ptr = heatmap.ptr<unsigned char>(0);
             
-            int total_elements = frame.rows * frame.cols * frame.channels();
+        //     int total_elements = frame.rows * frame.cols * frame.channels();
             
-            // 2. Blast through memory with a single loop
-            for (int i = 0; i < total_elements; ++i) {
+        //     // 2. Blast through memory with a single loop
+        //     for (int i = 0; i < total_elements; ++i) {
                 
-                // 3. SPARSITY CHECK: Only do math if the heatmap actually has color here
-                if (h_ptr[i] > 0) {
+        //         // 3. SPARSITY CHECK: Only do math if the heatmap actually has color here
+        //         if (h_ptr[i] > 0) {
                     
-                    // 4. INTEGER MATH: Right shift by 1 is identical to dividing by 2 (0.5 weight)
-                    // We use an integer to prevent byte overflow before clamping
-                    int blended_pixel = f_ptr[i] + (h_ptr[i] >> 1);
+        //             // 4. INTEGER MATH: Right shift by 1 is identical to dividing by 2 (0.5 weight)
+        //             // We use an integer to prevent byte overflow before clamping
+        //             int blended_pixel = f_ptr[i] + (h_ptr[i] >> 1);
                     
-                    // 5. CLAMP: Ensure it doesn't wrap past 255 (white)
-                    if (blended_pixel > 255) {
-                        f_ptr[i] = 255;
-                    } else {
-                        f_ptr[i] = (unsigned char)blended_pixel;
-                    }
-                }
-            }
-        } else {
-            // Fallback if matrices are chunked (rare for standard video captures)
-            for (int r = 0; r < frame.rows; ++r) {
-                unsigned char* f_ptr = frame.ptr<unsigned char>(r);
-                const unsigned char* h_ptr = heatmap.ptr<unsigned char>(r);
+        //             // 5. CLAMP: Ensure it doesn't wrap past 255 (white)
+        //             if (blended_pixel > 255) {
+        //                 f_ptr[i] = 255;
+        //             } else {
+        //                 f_ptr[i] = (unsigned char)blended_pixel;
+        //             }
+        //         }
+        //     }
+        // } else {
+        //     // Fallback if matrices are chunked (rare for standard video captures)
+        //     for (int r = 0; r < frame.rows; ++r) {
+        //         unsigned char* f_ptr = frame.ptr<unsigned char>(r);
+        //         const unsigned char* h_ptr = heatmap.ptr<unsigned char>(r);
                 
-                for (int c = 0; c < frame.cols * frame.channels(); ++c) {
-                    if (h_ptr[c] > 0) {
-                        int blended_pixel = f_ptr[c] + (h_ptr[c] >> 1);
-                        f_ptr[c] = (blended_pixel > 255) ? 255 : (unsigned char)blended_pixel;
-                    }
-                }
-            }
-        }
+        //         for (int c = 0; c < frame.cols * frame.channels(); ++c) {
+        //             if (h_ptr[c] > 0) {
+        //                 int blended_pixel = f_ptr[c] + (h_ptr[c] >> 1);
+        //                 f_ptr[c] = (blended_pixel > 255) ? 255 : (unsigned char)blended_pixel;
+        //             }
+        //         }
+        //     }
+        // }
 
         cv::imshow("Camera Overlay", displayFrame);
 
